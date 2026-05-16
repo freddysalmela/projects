@@ -3,6 +3,13 @@ import speech_recognition as sr
 from booster.config import Config
 from booster.ui.terminal import print_status, print_error
 
+_PYAUDIO_HINT = (
+    "PyAudio is not installed.\n"
+    "  Windows: pip install pipwin && pipwin install pyaudio\n"
+    "  Linux:   sudo apt install portaudio19-dev && pip install pyaudio\n"
+    "  macOS:   brew install portaudio && pip install pyaudio"
+)
+
 
 class Listener:
     def __init__(self, cfg: Config):
@@ -13,9 +20,13 @@ class Listener:
 
     def calibrate(self):
         print_status("Calibrating microphone for ambient noise...")
-        with sr.Microphone() as source:
-            self.recognizer.adjust_for_ambient_noise(source, duration=2)
-        print_status("Microphone ready.")
+        try:
+            with sr.Microphone() as source:
+                self.recognizer.adjust_for_ambient_noise(source, duration=2)
+            print_status("Microphone ready.")
+        except OSError:
+            print_error(_PYAUDIO_HINT)
+            raise
 
     def listen_once(self) -> str | None:
         print_status("Listening...")
@@ -23,6 +34,9 @@ class Listener:
             with sr.Microphone() as source:
                 audio = self.recognizer.listen(source, timeout=self.timeout, phrase_time_limit=15)
         except sr.WaitTimeoutError:
+            return None
+        except OSError:
+            print_error(_PYAUDIO_HINT)
             return None
         except Exception as e:
             print_error(f"Microphone error: {e}")
