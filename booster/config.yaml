@@ -1,0 +1,18 @@
+booster:
+  model: claude-sonnet-4-6
+  max_history_turns: 20
+
+audio:
+  stt_backend: google       # google | whisper
+  tts_backend: gtts         # gtts | pyttsx3
+  whisper_model: tiny       # tiny | base | small
+  wake_mode: wake_word      # wake_word | push_to_talk
+  speech_timeout: 5
+  pause_threshold: 0.8
+
+search:
+  max_results: 5
+
+planner:
+  save_plans: true
+  plans_directory: ~/booster_plans
