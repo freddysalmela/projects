@@ -54,20 +54,8 @@ def main():
         finally:
             _lock.release()
 
-    wake_mode = cfg.wake_mode
-    model_name = "hey_mycroft"  # closest available; swap for custom "hey_booster" model when trained
-
-    wake_detector = WakeWordDetector(on_wake=handle_session, model_name=model_name)
+    wake_detector = WakeWordDetector(on_wake=handle_session, trigger="booster")
     wake_detector.start()
-
-    if wake_mode == "wake_word":
-        try:
-            import openwakeword  # noqa: F401
-            print_status("Say 'Hey Booster' to activate. Ctrl+C to quit.")
-        except ImportError:
-            print_status("Press Enter to speak. Ctrl+C to quit.")
-    else:
-        print_status("Press Enter to speak. Ctrl+C to quit.")
 
     try:
         wake_detector._thread.join()

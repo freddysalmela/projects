@@ -119,8 +119,8 @@ booster
 
 | Mode | Default | How to activate |
 |---|---|---|
-| Wake word | `hey_mycroft` model | Say "Hey Mycroft" (or train a custom "Hey Booster" model) |
-| Push-to-talk | Fallback | Press **Enter** then speak |
+| Wake word | default | Say **"Hey Booster"** |
+| Push-to-talk | fallback if mic unavailable | Press **Enter** then speak |
 
 Say **"Goodbye Booster"** or press **Ctrl+C** to quit.
 
@@ -141,11 +141,6 @@ On Windows, `pyttsx3` uses the built-in Windows SAPI5 voices — no extra instal
 `gtts` (Google TTS) is the default and sounds more natural but requires internet.
 
 ---
-
-## Custom wake word
-
-To use "Hey Booster" as the wake word, train a custom model with [OpenWakeWord](https://github.com/dscripka/openWakeWord).
-Until then, "Hey Mycroft" is the closest available built-in trigger phrase.
 
 ---
 
