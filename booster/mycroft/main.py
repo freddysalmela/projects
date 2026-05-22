@@ -1,7 +1,6 @@
 import sys
 import tempfile
 import os
-import threading
 from datetime import date
 
 import pyaudio
@@ -9,6 +8,7 @@ import wave
 import math
 import struct
 
+from mycroft.audio.tts import speak
 from mycroft.config import load_config
 from mycroft.brain.claude_client import ClaudeClient
 from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_status, print_error
@@ -77,31 +77,6 @@ def transcribe(wav_path: str, openai_key: str) -> str:
     return result.text.strip()
 
 
-def speak(text: str, openai_key: str):
-    import openai, pygame
-    pygame.mixer.init()
-    client = openai.OpenAI(api_key=openai_key)
-    response = client.audio.speech.create(
-        model="tts-1",
-        voice="onyx",
-        input=text,
-        speed=1.0,
-    )
-    tmp = tempfile.mktemp(suffix=".mp3")
-    try:
-        with open(tmp, "wb") as f:
-            f.write(response.content)
-        pygame.mixer.music.load(tmp)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.wait(50)
-    finally:
-        try:
-            os.remove(tmp)
-        except Exception:
-            pass
-
-
 def main():
     cfg = load_config()
 
@@ -117,7 +92,7 @@ def main():
     print_banner()
     print_status("Tryck Enter för att tala. Ctrl+C för att avsluta.")
 
-    speak("Mycroft online. Redo att hjälpa.", cfg.openai_api_key)
+    speak("Mycroft online. Redo att hjälpa.")
 
     while True:
         try:
@@ -138,13 +113,16 @@ def main():
             print_user(text)
 
             if text.lower().strip() in ("hej då mycroft", "stäng av", "avsluta"):
-                speak("Stänger av. Ha det bra!", cfg.openai_api_key)
+                speak("Stänger av. Ha det bra!")
                 sys.exit(0)
 
             print_status("Tänker...")
-            response = claude.chat(text)
-            print_mycroft(response)
-            speak(response, cfg.openai_api_key)
+            full_sentences = []
+            for sentence in claude.chat_stream(text):
+                full_sentences.append(sentence)
+                speak(sentence)  # play each sentence as it arrives
+
+            print_mycroft(" ".join(full_sentences))
 
         except KeyboardInterrupt:
             print_status("Avslutar. Hej då!")
