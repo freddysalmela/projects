@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mycroft</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #orb {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #1a6fff, #003399);
+    box-shadow: 0 0 30px #1a6fff55;
+    transition: all 0.3s ease;
+    margin-bottom: 40px;
+  }
+  #orb.listening { box-shadow: 0 0 60px #1a6fffaa; transform: scale(1.1); }
+  #orb.thinking  { background: radial-gradient(circle at 35% 35%, #ff9900, #cc6600); box-shadow: 0 0 60px #ff990088; animation: pulse 1s infinite; }
+  #orb.speaking  { background: radial-gradient(circle at 35% 35%, #00cc66, #006633); box-shadow: 0 0 60px #00cc6688; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+  #status {
+    font-size: 14px;
+    color: #4a9eff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    height: 20px;
+  }
+  #transcript {
+    font-size: 13px;
+    color: #666;
+    max-width: 500px;
+    text-align: center;
+    min-height: 20px;
+    margin-bottom: 30px;
+    font-style: italic;
+  }
+  #response {
+    font-size: 15px;
+    color: #ccc;
+    max-width: 600px;
+    text-align: center;
+    line-height: 1.7;
+    min-height: 60px;
+    padding: 0 20px;
+  }
+  #hint {
+    position: fixed;
+    bottom: 20px;
+    font-size: 11px;
+    color: #333;
+    letter-spacing: 1px;
+  }
+  #error {
+    position: fixed;
+    top: 20px;
+    background: #300;
+    color: #f66;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="error"></div>
+<div id="orb"></div>
+<div id="status">INITIALIZING</div>
+<div id="transcript"></div>
+<div id="response"></div>
+<div id="hint">SAY "HEY MYCROFT" TO ACTIVATE</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const orb = document.getElementById('orb');
+const status = document.getElementById('status');
+const transcript = document.getElementById('transcript');
+const response = document.getElementById('response');
+const errorBox = document.getElementById('error');
+
+let recognition;
+let inSession = false;
+let synth = window.speechSynthesis;
+
+function setOrb(state, msg) {
+  orb.className = state;
+  status.textContent = msg;
+}
+
+function showError(msg) {
+  errorBox.style.display = 'block';
+  errorBox.textContent = msg;
+  setTimeout(() => errorBox.style.display = 'none', 5000);
+}
+
+// ── Speech Recognition ──────────────────────────────────────────────
+function startWakeWordListening() {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    showError('Speech recognition not supported. Use Brave or Chrome.');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => setOrb('', 'LISTENING FOR WAKE WORD');
+
+  recognition.onresult = (e) => {
+    if (inSession) return;
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript.toLowerCase();
+      if (e.results[i].isFinal) {
+        if (t.includes('mycroft')) {
+          triggerSession();
+          return;
+        }
+      } else {
+        interim = t;
+        if (interim.includes('mycroft')) {
+          triggerSession();
+          return;
+        }
+      }
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error !== 'no-speech' && e.error !== 'aborted') showError('Mic error: ' + e.error);
+  };
+
+  recognition.onend = () => {
+    if (!inSession) setTimeout(() => recognition.start(), 300);
+  };
+
+  recognition.start();
+}
+
+function triggerSession() {
+  if (inSession) return;
+  inSession = true;
+  recognition.stop();
+  transcript.textContent = '';
+  response.textContent = '';
+  listenForCommand();
+}
+
+function listenForCommand() {
+  setOrb('listening', 'LISTENING');
+  speak_local('Yeah?', () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const cmd = new SR();
+    cmd.lang = 'en-US';
+    cmd.interimResults = true;
+    cmd.maxAlternatives = 1;
+
+    cmd.onresult = (e) => {
+      let text = '';
+      for (let i = 0; i < e.results.length; i++) {
+        text = e.results[i][0].transcript;
+      }
+      transcript.textContent = '"' + text + '"';
+    };
+
+    cmd.onspeechend = () => cmd.stop();
+
+    cmd.onend = () => {
+      const final = transcript.textContent.replace(/^"|"$/g, '');
+      if (final) {
+        sendCommand(final);
+      } else {
+        transcript.textContent = '';
+        inSession = false;
+        startWakeWordListening();
+      }
+    };
+
+    cmd.onerror = () => {
+      inSession = false;
+      startWakeWordListening();
+    };
+
+    cmd.start();
+  });
+}
+
+function sendCommand(text) {
+  setOrb('thinking', 'THINKING');
+  transcript.textContent = '"' + text + '"';
+  socket.emit('command', { text: text });
+}
+
+// ── Socket events ───────────────────────────────────────────────────
+socket.on('response', (data) => {
+  response.textContent = data.text;
+  setOrb('speaking', 'SPEAKING');
+  speak_local(data.text, () => {
+    inSession = false;
+    setOrb('', 'READY');
+    startWakeWordListening();
+  });
+});
+
+socket.on('error', (data) => {
+  showError(data.message);
+  inSession = false;
+  startWakeWordListening();
+});
+
+socket.on('connect', () => {
+  setOrb('', 'CONNECTED');
+  startWakeWordListening();
+});
+
+// ── TTS ─────────────────────────────────────────────────────────────
+function speak_local(text, callback) {
+  if (synth.speaking) synth.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 1.0;
+  utt.pitch = 0.9;
+  utt.volume = 1.0;
+  // prefer a deeper/masculine voice if available
+  const voices = synth.getVoices();
+  const preferred = voices.find(v => v.name.includes('David') || v.name.includes('Mark') || (v.lang === 'en-US' && v.name.toLowerCase().includes('male')));
+  if (preferred) utt.voice = preferred;
+  utt.onend = callback || (() => {});
+  utt.onerror = callback || (() => {});
+  synth.speak(utt);
+}
+
+// Load voices async
+if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => {};
+
+setOrb('', 'READY');
+startWakeWordListening();
+</script>
+</body>
+</html>
