@@ -138,10 +138,10 @@ function activate() {
 function speak(text, onDone) {
   speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
-  utt.lang  = 'en-US';
+  utt.lang  = 'sv-SE';
   utt.rate  = 1.0;
   utt.pitch = 0.85;
-  const v = voices.find(v => v.lang.startsWith('en') && /david|mark|guy/i.test(v.name))
+  const v = voices.find(v => v.lang.startsWith('sv'))
          || voices.find(v => v.lang.startsWith('en-US'))
          || voices.find(v => v.lang.startsWith('en'));
   if (v) utt.voice = v;
