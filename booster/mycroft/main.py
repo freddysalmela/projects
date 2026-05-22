@@ -87,7 +87,7 @@ def _generate_tts(text: str) -> str | None:
         )
         filename = f"{uuid.uuid4().hex}.mp3"
         path = _AUDIO_DIR / filename
-        response.stream_to_file(str(path))
+        path.write_bytes(response.content)  # write fully before serving
         # clean up old files in background
         threading.Thread(target=_cleanup_old_audio, daemon=True).start()
         return f"/audio/{filename}"
