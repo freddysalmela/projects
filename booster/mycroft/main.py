@@ -13,7 +13,7 @@ from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_s
 
 _STATIC = str(Path(__file__).parent / "ui" / "static")
 
-app = Flask(__name__, static_folder=_STATIC)
+app      = Flask(__name__, static_folder=_STATIC)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 _claude: ClaudeClient | None = None
@@ -30,13 +30,36 @@ def index():
     return send_from_directory(_STATIC, "index.html")
 
 
+@socketio.on("start_listen")
+def handle_start_listen():
+    """Browser says 'start listening' — Python records and transcribes."""
+    try:
+        from mycroft.audio.recorder    import record_until_silence
+        from mycroft.audio.transcriber import transcribe
+
+        print_status("Recording...")
+        wav = record_until_silence()
+
+        print_status("Transcribing...")
+        text = transcribe(wav)
+
+        if text:
+            print_user(text)
+            emit("transcript", {"text": text})
+        else:
+            emit("transcript", {"text": ""})
+
+    except Exception as e:
+        print_error(str(e))
+        emit("listen_error", {"message": str(e)})
+
+
 @socketio.on("command")
 def handle_command(data):
+    """Browser sends final transcript — Claude processes it."""
     text = data.get("text", "").strip()
     if not text:
         return
-
-    print_user(text)
 
     if text.lower() in ("goodbye mycroft", "shut down", "power off"):
         emit("response", {"text": "Shutting down. See you later."})
@@ -49,7 +72,7 @@ def handle_command(data):
         emit("response", {"text": response})
     except Exception as e:
         print_error(str(e))
-        emit("error", {"message": f"Error: {e}"})
+        emit("error", {"message": str(e)})
 
 
 def _open_brave():
