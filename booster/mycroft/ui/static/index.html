@@ -87,12 +87,8 @@ function boot() {
   socket.on('response', (data) => {
     respEl.textContent = data.text;
     setUI('speaking', 'TALAR');
-    if (data.audio_url) {
-      playUrl(data.audio_url, () => { busy = false; setUI('idle', 'REDO'); });
-    } else {
-      busy = false;
-      setUI('idle', 'REDO');
-    }
+    // Audio plays via Python/pygame directly — just reset UI after a moment
+    setTimeout(() => { busy = false; setUI('idle', 'REDO'); }, 1000);
   });
 
   socket.on('error', (data) => {

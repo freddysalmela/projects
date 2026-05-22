@@ -4,20 +4,17 @@ import sys
 import tempfile
 import threading
 import time
-import uuid
 import webbrowser
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory, send_file
+from flask import Flask, jsonify, request, send_from_directory
 from flask_socketio import SocketIO, emit
 
 from mycroft.config import load_config
 from mycroft.brain.claude_client import ClaudeClient
 from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_status, print_error
 
-_STATIC   = str(Path(__file__).parent / "ui" / "static")
-_AUDIO_DIR = Path(tempfile.gettempdir()) / "mycroft_audio"
-_AUDIO_DIR.mkdir(exist_ok=True)
+_STATIC = str(Path(__file__).parent / "ui" / "static")
 
 app      = Flask(__name__, static_folder=_STATIC)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
@@ -35,15 +32,6 @@ _BRAVE_PATHS = [
 @app.route("/")
 def index():
     return send_from_directory(_STATIC, "index.html")
-
-
-@app.route("/audio/<filename>")
-def serve_audio(filename):
-    """Serve a generated TTS audio file."""
-    path = _AUDIO_DIR / filename
-    if not path.exists():
-        return "Not found", 404
-    return send_file(str(path), mimetype="audio/mpeg")
 
 
 @app.route("/transcribe", methods=["POST"])
@@ -74,53 +62,26 @@ def transcribe():
             os.remove(tmp)
 
 
-def _generate_tts(text: str) -> str | None:
-    """Generate TTS audio, save to file, return URL path."""
-    try:
-        import openai
-        client = openai.OpenAI(api_key=_openai_key)
-        response = client.audio.speech.create(
-            model="tts-1",
-            voice="onyx",
-            input=text,
-            speed=1.0,
-        )
-        filename = f"{uuid.uuid4().hex}.mp3"
-        path = _AUDIO_DIR / filename
-        path.write_bytes(response.content)  # write fully before serving
-        # clean up old files in background
-        threading.Thread(target=_cleanup_old_audio, daemon=True).start()
-        return f"/audio/{filename}"
-    except Exception as e:
-        print_error(f"TTS error: {e}")
-        return None
-
-
-def _cleanup_old_audio():
-    """Delete audio files older than 60 seconds."""
-    now = time.time()
-    for f in _AUDIO_DIR.glob("*.mp3"):
-        if now - f.stat().st_mtime > 60:
-            f.unlink(missing_ok=True)
-
-
 @socketio.on("command")
 def handle_command(data):
+    from mycroft.audio.tts import speak
+
     text = data.get("text", "").strip()
     if not text:
         return
 
     if text.lower() in ("hej då mycroft", "stäng av", "goodbye mycroft", "shut down"):
-        audio_url = _generate_tts("Stänger av. Ha det bra!")
-        emit("response", {"text": "Stänger av. Ha det bra!", "audio_url": audio_url})
+        farewell = "Stänger av. Ha det bra!"
+        emit("response", {"text": farewell})
+        threading.Thread(target=speak, args=(farewell, _openai_key), daemon=True).start()
         return
 
     print_status("Thinking...")
     try:
         response = _claude.chat(text)
         print_mycroft(response)
-        audio_url = _generate_tts(response)
-        emit("response", {"text": response, "audio_url": audio_url})
+        emit("response", {"text": response})
+        threading.Thread(target=speak, args=(response, _openai_key), daemon=True).start()
     except Exception as e:
         print_error(str(e))
         emit("error", {"message": str(e)})
