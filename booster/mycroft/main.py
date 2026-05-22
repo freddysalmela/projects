@@ -58,7 +58,7 @@ def main():
     wake_detector.start()
 
     try:
-        wake_detector._thread.join()
+        wake_detector._listen_thread.join()
     except KeyboardInterrupt:
         print_status("\nShutting down Mycroft. See you later.")
         wake_detector.stop()
