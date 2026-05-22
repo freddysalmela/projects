@@ -120,9 +120,12 @@ def main():
             full_sentences = []
             for sentence in claude.chat_stream(text):
                 full_sentences.append(sentence)
-                speak(sentence)  # play each sentence as it arrives
+                print(sentence, end=" ", flush=True)  # show text as it streams in
 
-            print_mycroft(" ".join(full_sentences))
+            full_response = " ".join(full_sentences)
+            print()  # newline after streamed text
+            print_mycroft(full_response)
+            speak(full_response)
 
         except KeyboardInterrupt:
             print_status("Avslutar. Hej då!")
