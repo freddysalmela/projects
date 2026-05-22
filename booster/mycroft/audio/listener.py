@@ -1,55 +1,22 @@
-import speech_recognition as sr
-
+from mycroft.audio.stt import load_model, transcribe_once
 from mycroft.config import Config
 from mycroft.ui.terminal import print_status, print_error
-
-_PYAUDIO_HINT = (
-    "PyAudio is not installed.\n"
-    "  Windows: pip install pipwin && pipwin install pyaudio\n"
-    "  Linux:   sudo apt install portaudio19-dev && pip install pyaudio\n"
-    "  macOS:   brew install portaudio && pip install pyaudio"
-)
 
 
 class Listener:
     def __init__(self, cfg: Config):
-        self.recognizer = sr.Recognizer()
-        self.recognizer.pause_threshold = cfg.pause_threshold
         self.timeout = cfg.speech_timeout
-        self.backend = cfg.stt_backend
+        self._model = None
 
     def calibrate(self):
-        print_status("Calibrating microphone for ambient noise...")
-        try:
-            with sr.Microphone() as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=2)
-            print_status("Microphone ready.")
-        except OSError:
-            print_error(_PYAUDIO_HINT)
-            raise
+        print_status("Loading speech recognition model (downloading if first run)...")
+        self._model = load_model()
+        print_status("Ready.")
 
     def listen_once(self) -> str | None:
         print_status("Listening...")
         try:
-            with sr.Microphone() as source:
-                audio = self.recognizer.listen(source, timeout=self.timeout, phrase_time_limit=15)
-        except sr.WaitTimeoutError:
-            return None
-        except OSError:
-            print_error(_PYAUDIO_HINT)
-            return None
+            return transcribe_once(self._model, timeout_seconds=self.timeout)
         except Exception as e:
-            print_error(f"Microphone error: {e}")
-            return None
-
-        try:
-            if self.backend == "google":
-                text = self.recognizer.recognize_google(audio)
-            else:
-                text = self.recognizer.recognize_google(audio)
-            return text.strip()
-        except sr.UnknownValueError:
-            return None
-        except sr.RequestError as e:
-            print_error(f"STT service error: {e}")
+            print_error(f"Listen error: {e}")
             return None
