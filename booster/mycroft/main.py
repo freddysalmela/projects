@@ -1,10 +1,12 @@
+import os
 import subprocess
 import sys
+import tempfile
 import threading
 import webbrowser
 from pathlib import Path
 
-from flask import Flask, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 from flask_socketio import SocketIO, emit
 
 from mycroft.config import load_config
@@ -16,7 +18,8 @@ _STATIC = str(Path(__file__).parent / "ui" / "static")
 app      = Flask(__name__, static_folder=_STATIC)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-_claude: ClaudeClient | None = None
+_claude        = None
+_openai_key    = None
 
 _BRAVE_PATHS = [
     r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
@@ -30,39 +33,45 @@ def index():
     return send_from_directory(_STATIC, "index.html")
 
 
-@socketio.on("start_listen")
-def handle_start_listen():
-    """Browser says 'start listening' — Python records and transcribes."""
+@app.route("/transcribe", methods=["POST"])
+def transcribe():
+    """Receive audio blob from browser, transcribe with OpenAI Whisper API."""
+    import openai
+
+    audio_file = request.files.get("audio")
+    if not audio_file:
+        return jsonify({"error": "No audio received"}), 400
+
+    suffix = ".webm"
+    tmp = tempfile.mktemp(suffix=suffix)
     try:
-        from mycroft.audio.recorder    import record_until_silence
-        from mycroft.audio.transcriber import transcribe
-
-        print_status("Recording...")
-        wav = record_until_silence()
-
-        print_status("Transcribing...")
-        text = transcribe(wav)
-
-        if text:
-            print_user(text)
-            emit("transcript", {"text": text})
-        else:
-            emit("transcript", {"text": ""})
-
+        audio_file.save(tmp)
+        client = openai.OpenAI(api_key=_openai_key)
+        with open(tmp, "rb") as f:
+            result = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+                language="sv",
+            )
+        text = result.text.strip()
+        print_user(text)
+        return jsonify({"text": text})
     except Exception as e:
-        print_error(str(e))
-        emit("listen_error", {"message": str(e)})
+        print_error(f"Transcription error: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 @socketio.on("command")
 def handle_command(data):
-    """Browser sends final transcript — Claude processes it."""
     text = data.get("text", "").strip()
     if not text:
         return
 
-    if text.lower() in ("goodbye mycroft", "shut down", "power off"):
-        emit("response", {"text": "Shutting down. See you later."})
+    if text.lower() in ("hej då mycroft", "stäng av", "goodbye mycroft", "shut down"):
+        emit("response", {"text": "Stänger av. Ha det bra!", "audio": None})
         return
 
     print_status("Thinking...")
@@ -92,15 +101,20 @@ def main():
     cfg = load_config()
 
     if not cfg.anthropic_api_key:
-        print_error("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
+        print_error("ANTHROPIC_API_KEY saknas. Lägg till den i .env-filen.")
         sys.exit(1)
 
-    global _claude
-    _claude = ClaudeClient(cfg)
+    if not cfg.openai_api_key:
+        print_error("OPENAI_API_KEY saknas. Lägg till den i .env-filen.")
+        sys.exit(1)
+
+    global _claude, _openai_key
+    _claude     = ClaudeClient(cfg)
+    _openai_key = cfg.openai_api_key
 
     print_banner()
-    print_status("Server running on http://localhost:5050")
-    print_status("Opening Brave...")
+    print_status("Server på http://localhost:5050")
+    print_status("Öppnar Brave...")
 
     threading.Thread(target=_open_brave, daemon=True).start()
 

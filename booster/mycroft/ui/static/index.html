@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
 <meta charset="UTF-8">
 <title>Mycroft</title>
@@ -12,6 +12,7 @@
     align-items:center; justify-content:center;
     user-select:none; overflow:hidden;
   }
+
   #orb {
     width:160px; height:160px; border-radius:50%;
     background:radial-gradient(circle at 38% 35%,#1a6fff,#001a88);
@@ -19,17 +20,17 @@
     margin-bottom:40px; cursor:pointer;
     transition:all 0.15s ease;
   }
-  #orb:active,
-  #orb.listening { transform:scale(1.12); box-shadow:0 0 80px #1a6fffbb; }
+  #orb.idle      { box-shadow:0 0 30px #1a6fff44; }
+  #orb.recording { background:radial-gradient(circle at 38% 35%,#ff3333,#880000); box-shadow:0 0 80px #ff333399; transform:scale(1.1); animation:pulse 0.6s ease-in-out infinite; }
   #orb.thinking  { background:radial-gradient(circle at 38% 35%,#ffaa00,#aa5500); box-shadow:0 0 60px #ffaa0099; animation:pulse 0.9s ease-in-out infinite; }
   #orb.speaking  { background:radial-gradient(circle at 38% 35%,#00dd77,#004422); box-shadow:0 0 60px #00dd7788; }
-  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  @keyframes pulse{0%,100%{transform:scale(1.0)}50%{transform:scale(1.08)}}
 
   #status { font-size:13px; letter-spacing:3px; text-transform:uppercase; color:#4a9eff; height:20px; margin-bottom:16px; }
   #heard  { font-size:14px; color:#556; font-style:italic; min-height:20px; margin-bottom:28px; max-width:560px; text-align:center; }
   #resp   { font-size:16px; color:#ccc; max-width:640px; text-align:center; line-height:1.8; min-height:80px; padding:0 28px; }
   #hint   { position:fixed; bottom:24px; font-size:11px; color:#222; letter-spacing:2px; text-transform:uppercase; }
-  #err    { position:fixed; top:18px; background:#1a0000; color:#ff5555; border:1px solid #550000; padding:10px 22px; border-radius:6px; font-size:12px; display:none; max-width:500px; text-align:center; }
+  #err    { position:fixed; top:18px; background:#1a0000; color:#ff5555; border:1px solid #550000; padding:10px 22px; border-radius:6px; font-size:12px; display:none; max-width:520px; text-align:center; }
 
   #start {
     position:fixed; inset:0; background:#080810;
@@ -47,15 +48,15 @@
 <div id="start" onclick="boot()">
   <div id="start-orb"></div>
   <h1>MYCROFT</h1>
-  <p>Click to start</p>
+  <p>Klicka för att starta</p>
 </div>
 
 <div id="err"></div>
-<div id="orb" onclick="activate()"></div>
-<div id="status">READY</div>
+<div id="orb" id="orb" onclick="toggleRecord()"></div>
+<div id="status">REDO</div>
 <div id="heard"></div>
 <div id="resp"></div>
-<div id="hint">CLICK ORB OR PRESS SPACE TO SPEAK</div>
+<div id="hint">KLICKA PÅ ORB ELLER TRYCK MELLANSLAG FÖR ATT TALA</div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
@@ -66,6 +67,7 @@ const respEl   = document.getElementById('resp');
 const errEl    = document.getElementById('err');
 
 let socket, voices = [], busy = false;
+let mediaRecorder = null, audioChunks = [], micStream = null;
 
 // ── Boot ──────────────────────────────────────────────────────────
 function boot() {
@@ -79,85 +81,140 @@ function boot() {
     reconnectionAttempts: 20,
   });
 
-  socket.on('connect',    () => setUI('idle',  'READY'));
-  socket.on('disconnect', () => setUI('idle',  'RECONNECTING...'));
-
-  // Python recorded and transcribed — show what was heard, then send as command
-  socket.on('transcript', (data) => {
-    const text = (data.text || '').trim();
-    if (!text) {
-      busy = false;
-      setUI('idle', 'READY');
-      heardEl.textContent = '';
-      return;
-    }
-    heardEl.textContent = '"' + text + '"';
-    setUI('thinking', 'THINKING');
-    socket.emit('command', { text });
-  });
-
-  socket.on('listen_error', (data) => {
-    showErr(data.message);
-    busy = false;
-    setUI('idle', 'READY');
-  });
+  socket.on('connect',    () => setUI('idle', 'REDO'));
+  socket.on('disconnect', () => setUI('idle', 'ÅTERANSLUTER...'));
 
   socket.on('response', (data) => {
     respEl.textContent = data.text;
-    setUI('speaking', 'SPEAKING');
+    setUI('speaking', 'TALAR');
     if (data.audio) {
-      playAudio(data.audio, () => { busy = false; setUI('idle', 'READY'); });
+      playB64Audio(data.audio, () => { busy = false; setUI('idle', 'REDO'); });
     } else {
-      // fallback to browser TTS if server couldn't generate audio
-      speak(data.text, () => { busy = false; setUI('idle', 'READY'); });
+      busy = false;
+      setUI('idle', 'REDO');
     }
   });
 
   socket.on('error', (data) => {
     showErr(data.message);
     busy = false;
-    setUI('idle', 'READY');
+    setUI('idle', 'REDO');
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && !busy) { e.preventDefault(); activate(); }
+    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); if (!busy) startRecording(); }
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.code === 'Space' && mediaRecorder) { e.preventDefault(); stopRecording(); }
   });
 
-  setUI('idle', 'READY');
+  setUI('idle', 'REDO');
 }
 
-// ── Activate: tell Python to start recording ──────────────────────
-function activate() {
-  if (busy || !socket || !socket.connected) return;
+// ── Recording ─────────────────────────────────────────────────────
+function toggleRecord() {
+  if (busy) return;
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+async function startRecording() {
+  if (busy) return;
   busy = true;
   heardEl.textContent = '';
   respEl.textContent  = '';
-  setUI('listening', 'LISTENING...');
-  socket.emit('start_listen');
+
+  try {
+    micStream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(micStream);
+
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = onRecordingStop;
+    mediaRecorder.start(100); // collect in 100ms chunks
+
+    setUI('recording', 'LYSSNAR — KLICKA FÖR ATT STOPPA');
+
+    // Auto-stop via silence detection
+    const ctx      = new AudioContext();
+    const analyser = ctx.createAnalyser();
+    const src      = ctx.createMediaStreamSource(micStream);
+    src.connect(analyser);
+    analyser.fftSize = 512;
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+
+    let silenceStart = null;
+    let speechDetected = false;
+    const start = Date.now();
+
+    function tick() {
+      if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+      analyser.getByteFrequencyData(buf);
+      const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
+      const elapsed = Date.now() - start;
+
+      if (avg > 8) {
+        speechDetected = true;
+        silenceStart = null;
+      } else if (speechDetected) {
+        if (!silenceStart) silenceStart = Date.now();
+        else if (Date.now() - silenceStart > 1200) { stopRecording(); ctx.close(); return; }
+      }
+
+      if (elapsed > 10000) { stopRecording(); ctx.close(); return; } // 10s max
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+  } catch (e) {
+    showErr('Mikrofon ej tillgänglig: ' + e.message);
+    busy = false;
+    setUI('idle', 'REDO');
+  }
 }
 
-// ── Play base64 MP3 from server ───────────────────────────────────
-function playAudio(b64, onDone) {
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    micStream.getTracks().forEach(t => t.stop());
+  }
+}
+
+async function onRecordingStop() {
+  setUI('thinking', 'TRANSKRIBERAR...');
+  const blob = new Blob(audioChunks, { type: 'audio/webm' });
+  const form = new FormData();
+  form.append('audio', blob, 'audio.webm');
+
+  try {
+    const res  = await fetch('/transcribe', { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (data.error) { showErr(data.error); busy = false; setUI('idle', 'REDO'); return; }
+
+    const text = (data.text || '').trim();
+    if (!text) { heardEl.textContent = ''; busy = false; setUI('idle', 'REDO'); return; }
+
+    heardEl.textContent = '"' + text + '"';
+    setUI('thinking', 'TÄNKER...');
+    socket.emit('command', { text });
+
+  } catch (e) {
+    showErr('Fel: ' + e.message);
+    busy = false;
+    setUI('idle', 'REDO');
+  }
+}
+
+// ── Audio playback ────────────────────────────────────────────────
+function playB64Audio(b64, onDone) {
   const audio = new Audio('data:audio/mp3;base64,' + b64);
   audio.onended = onDone;
-  audio.onerror = () => onDone && onDone();
-  audio.play().catch(() => onDone && onDone());
-}
-
-// ── Browser TTS fallback ──────────────────────────────────────────
-function speak(text, onDone) {
-  speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.lang  = 'sv-SE';
-  utt.rate  = 1.0;
-  utt.pitch = 0.85;
-  const v = voices.find(v => v.lang.startsWith('sv'))
-         || voices.find(v => v.lang.startsWith('en-US'))
-         || voices.find(v => v.lang.startsWith('en'));
-  if (v) utt.voice = v;
-  utt.onend   = onDone;
-  utt.onerror = onDone;
-  speechSynthesis.speak(utt);
+  audio.onerror = onDone;
+  audio.play().catch(onDone);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -166,8 +223,8 @@ function setUI(cls, msg) {
   statusEl.textContent = msg;
 }
 function showErr(msg) {
-  errEl.textContent    = msg;
-  errEl.style.display  = 'block';
+  errEl.textContent   = msg;
+  errEl.style.display = 'block';
   setTimeout(() => errEl.style.display = 'none', 7000);
 }
 </script>

@@ -21,20 +21,10 @@ def _load_yaml() -> dict:
 @dataclass
 class Config:
     anthropic_api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
+    openai_api_key: str    = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", ""))
     model: str = "claude-sonnet-4-6"
     max_history_turns: int = 20
-
-    stt_backend: str = "google"
-    tts_backend: str = "gtts"
-    whisper_model: str = "tiny"
-    wake_mode: str = "wake_word"
-    speech_timeout: int = 5
-    pause_threshold: float = 0.8
-
     search_max_results: int = 5
-
-    save_plans: bool = True
-    plans_directory: str = "~/mycroft_plans"
 
 
 def load_config() -> Config:
@@ -47,14 +37,6 @@ def load_config() -> Config:
     cfg = Config(
         model=os.environ.get("MYCROFT_MODEL", booster.get("model", "claude-sonnet-4-6")),
         max_history_turns=int(booster.get("max_history_turns", 20)),
-        stt_backend=os.environ.get("MYCROFT_STT", audio.get("stt_backend", "google")),
-        tts_backend=os.environ.get("MYCROFT_TTS", audio.get("tts_backend", "gtts")),
-        whisper_model=audio.get("whisper_model", "tiny"),
-        wake_mode=os.environ.get("MYCROFT_WAKE_MODE", audio.get("wake_mode", "wake_word")),
-        speech_timeout=int(audio.get("speech_timeout", 5)),
-        pause_threshold=float(audio.get("pause_threshold", 0.8)),
         search_max_results=int(search.get("max_results", 5)),
-        save_plans=bool(planner.get("save_plans", True)),
-        plans_directory=planner.get("plans_directory", "~/mycroft_plans"),
     )
     return cfg
