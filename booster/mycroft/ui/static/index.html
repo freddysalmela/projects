@@ -87,8 +87,8 @@ function boot() {
   socket.on('response', (data) => {
     respEl.textContent = data.text;
     setUI('speaking', 'TALAR');
-    if (data.audio) {
-      playB64Audio(data.audio, () => { busy = false; setUI('idle', 'REDO'); });
+    if (data.audio_url) {
+      playUrl(data.audio_url, () => { busy = false; setUI('idle', 'REDO'); });
     } else {
       busy = false;
       setUI('idle', 'REDO');
@@ -210,8 +210,8 @@ async function onRecordingStop() {
 }
 
 // ── Audio playback ────────────────────────────────────────────────
-function playB64Audio(b64, onDone) {
-  const audio = new Audio('data:audio/mp3;base64,' + b64);
+function playUrl(url, onDone) {
+  const audio = new Audio(url);
   audio.onended = onDone;
   audio.onerror = onDone;
   audio.play().catch(onDone);
