@@ -8,31 +8,36 @@ from mycroft.ui.terminal import print_status, print_error
 
 
 class WakeWordDetector:
-    """
-    Listens continuously for the phrase "mycroft" using short Google STT bursts.
-    Falls back to push-to-talk (Enter key) if the microphone is unavailable.
-    """
-
     def __init__(self, on_wake: Callable, trigger: str = "mycroft"):
         self.on_wake = on_wake
         self.trigger = trigger.lower()
         self._running = False
-        self._thread: threading.Thread | None = None
+        self._listen_thread: threading.Thread | None = None
+        self._enter_thread: threading.Thread | None = None
+        self._in_session = False
         self._recognizer = sr.Recognizer()
         self._recognizer.pause_threshold = 0.6
         self._recognizer.energy_threshold = 300
 
     def start(self):
         self._running = True
-        self._thread = threading.Thread(target=self._listen_loop, daemon=True)
-        self._thread.start()
+
+        # Always run Enter key as fallback alongside voice detection
+        self._enter_thread = threading.Thread(target=self._enter_loop, daemon=True)
+        self._enter_thread.start()
+
+        self._listen_thread = threading.Thread(target=self._listen_loop, daemon=True)
+        self._listen_thread.start()
 
     def stop(self):
         self._running = False
 
     def _listen_loop(self):
-        print_status(f'Say "Hey Mycroft" to activate. Ctrl+C to quit.')
+        print_status('Say "Hey Mycroft" to activate — or just press Enter.')
         while self._running:
+            if self._in_session:
+                time.sleep(0.1)
+                continue
             try:
                 with sr.Microphone() as source:
                     try:
@@ -44,26 +49,34 @@ class WakeWordDetector:
 
                 try:
                     text = self._recognizer.recognize_google(audio).lower()
+                    print_status(f'Heard: "{text}"')
                     if self.trigger in text:
-                        self.on_wake()
+                        self._trigger_wake()
                 except sr.UnknownValueError:
                     pass
-                except sr.RequestError:
-                    # network blip — wait briefly and retry
-                    time.sleep(2)
+                except sr.RequestError as e:
+                    print_error(f"Speech recognition unavailable: {e} — use Enter key instead.")
+                    time.sleep(5)
 
-            except OSError:
-                print_error(
-                    "Microphone unavailable. Falling back to push-to-talk — press Enter to speak."
-                )
-                self._push_to_talk_loop()
-                return
+            except OSError as e:
+                print_error(f"Microphone error: {e}")
+                time.sleep(2)
+            except Exception as e:
+                print_error(f"Wake word error: {e}")
+                time.sleep(1)
 
-    def _push_to_talk_loop(self):
+    def _enter_loop(self):
         while self._running:
             try:
                 input()
-                if self._running:
-                    self.on_wake()
+                if self._running and not self._in_session:
+                    self._trigger_wake()
             except EOFError:
                 time.sleep(0.1)
+
+    def _trigger_wake(self):
+        self._in_session = True
+        try:
+            self.on_wake()
+        finally:
+            self._in_session = False
