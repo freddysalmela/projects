@@ -55,6 +55,12 @@ def record() -> str | None:
         stream.close()
         pa.terminate()
 
+    # Reject recordings that never had real speech
+    all_shorts = struct.unpack(f"{len(b''.join(frames)) // 2}h", b"".join(frames))
+    peak_rms = math.sqrt(sum(s * s for s in all_shorts) / len(all_shorts)) if all_shorts else 0
+    if peak_rms < _SILENCE_THRESHOLD or not speech_started:
+        return None
+
     tmp = tempfile.mktemp(suffix=".wav")
     with wave.open(tmp, "wb") as wf:
         wf.setnchannels(_CHANNELS)
@@ -102,7 +108,10 @@ def main():
             sys.exit(0)
 
         try:
-            wav  = record()
+            wav = record()
+            if wav is None:
+                print_status("Hörde ingenting.")
+                continue
             print_status("Transkriberar...")
             text = transcribe(wav, cfg.openai_api_key)
 
