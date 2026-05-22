@@ -105,10 +105,12 @@ function boot() {
   socket.on('response', (data) => {
     respEl.textContent = data.text;
     setUI('speaking', 'SPEAKING');
-    speak(data.text, () => {
-      busy = false;
-      setUI('idle', 'READY');
-    });
+    if (data.audio) {
+      playAudio(data.audio, () => { busy = false; setUI('idle', 'READY'); });
+    } else {
+      // fallback to browser TTS if server couldn't generate audio
+      speak(data.text, () => { busy = false; setUI('idle', 'READY'); });
+    }
   });
 
   socket.on('error', (data) => {
@@ -134,7 +136,15 @@ function activate() {
   socket.emit('start_listen');
 }
 
-// ── TTS (browser speaks the response) ────────────────────────────
+// ── Play base64 MP3 from server ───────────────────────────────────
+function playAudio(b64, onDone) {
+  const audio = new Audio('data:audio/mp3;base64,' + b64);
+  audio.onended = onDone;
+  audio.onerror = () => onDone && onDone();
+  audio.play().catch(() => onDone && onDone());
+}
+
+// ── Browser TTS fallback ──────────────────────────────────────────
 function speak(text, onDone) {
   speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);

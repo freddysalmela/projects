@@ -67,9 +67,11 @@ def handle_command(data):
 
     print_status("Thinking...")
     try:
+        from mycroft.audio.tts import speak_to_base64
         response = _claude.chat(text)
         print_mycroft(response)
-        emit("response", {"text": response})
+        audio = speak_to_base64(response, lang="sv")
+        emit("response", {"text": response, "audio": audio})
     except Exception as e:
         print_error(str(e))
         emit("error", {"message": str(e)})
