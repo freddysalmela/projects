@@ -1,124 +1,156 @@
-import os
-import subprocess
 import sys
 import tempfile
+import os
 import threading
-import time
-import webbrowser
-from pathlib import Path
+from datetime import date
 
-from flask import Flask, jsonify, request, send_from_directory
-from flask_socketio import SocketIO, emit
+import pyaudio
+import wave
+import math
+import struct
 
 from mycroft.config import load_config
 from mycroft.brain.claude_client import ClaudeClient
 from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_status, print_error
 
-_STATIC = str(Path(__file__).parent / "ui" / "static")
-
-app      = Flask(__name__, static_folder=_STATIC)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
-
-_claude     = None
-_openai_key = None
-
-_BRAVE_PATHS = [
-    r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
-    r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
-    str(Path.home() / r"AppData\Local\BraveSoftware\Brave-Browser\Application\brave.exe"),
-]
+_RATE      = 16000
+_CHUNK     = 1024
+_CHANNELS  = 1
+_FORMAT    = pyaudio.paInt16
+_SILENCE_THRESHOLD = 400
+_SILENCE_SECS      = 1.5
+_MAX_SECS          = 12
 
 
-@app.route("/")
-def index():
-    return send_from_directory(_STATIC, "index.html")
+def record() -> str | None:
+    pa     = pyaudio.PyAudio()
+    stream = pa.open(format=_FORMAT, channels=_CHANNELS, rate=_RATE,
+                     input=True, frames_per_buffer=_CHUNK)
+    frames         = []
+    silent_chunks  = 0
+    max_silent     = int(_RATE / _CHUNK * _SILENCE_SECS)
+    max_chunks     = int(_RATE / _CHUNK * _MAX_SECS)
+    lead_in        = int(_RATE / _CHUNK * 0.3)
+    speech_started = False
 
-
-@app.route("/transcribe", methods=["POST"])
-def transcribe():
-    import openai
-    audio_file = request.files.get("audio")
-    if not audio_file:
-        return jsonify({"error": "No audio received"}), 400
-
-    tmp = tempfile.mktemp(suffix=".webm")
+    print_status("Lyssnar... (tala nu)")
     try:
-        audio_file.save(tmp)
-        client = openai.OpenAI(api_key=_openai_key)
-        with open(tmp, "rb") as f:
-            result = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=f,
-                language="sv",
-            )
-        text = result.text.strip()
-        print_user(text)
-        return jsonify({"text": text})
-    except Exception as e:
-        print_error(f"Transcription error: {e}")
-        return jsonify({"error": str(e)}), 500
+        stream.start_stream()
+        while len(frames) < max_chunks:
+            data = stream.read(_CHUNK, exception_on_overflow=False)
+            frames.append(data)
+            count  = len(data) // 2
+            shorts = struct.unpack(f"{count}h", data)
+            rms    = math.sqrt(sum(s * s for s in shorts) / count) if count else 0
+
+            if rms > _SILENCE_THRESHOLD:
+                speech_started = True
+                silent_chunks  = 0
+            elif speech_started and len(frames) > lead_in:
+                silent_chunks += 1
+                if silent_chunks >= max_silent:
+                    break
     finally:
-        if os.path.exists(tmp):
-            os.remove(tmp)
+        stream.stop_stream()
+        stream.close()
+        pa.terminate()
+
+    tmp = tempfile.mktemp(suffix=".wav")
+    with wave.open(tmp, "wb") as wf:
+        wf.setnchannels(_CHANNELS)
+        wf.setsampwidth(pyaudio.get_sample_size(_FORMAT))
+        wf.setframerate(_RATE)
+        wf.writeframes(b"".join(frames))
+    return tmp
 
 
-@socketio.on("command")
-def handle_command(data):
-    from mycroft.audio.tts import speak
+def transcribe(wav_path: str, openai_key: str) -> str:
+    import openai
+    client = openai.OpenAI(api_key=openai_key)
+    with open(wav_path, "rb") as f:
+        result = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=f,
+            language="sv",
+        )
+    os.remove(wav_path)
+    return result.text.strip()
 
-    text = data.get("text", "").strip()
-    if not text:
-        return
 
-    if text.lower() in ("hej då mycroft", "stäng av", "goodbye mycroft", "shut down"):
-        farewell = "Stänger av. Ha det bra!"
-        emit("response", {"text": farewell})
-        threading.Thread(target=speak, args=(farewell, _openai_key), daemon=True).start()
-        return
-
-    print_status("Thinking...")
+def speak(text: str, openai_key: str):
+    import openai, pygame
+    pygame.mixer.init()
+    client = openai.OpenAI(api_key=openai_key)
+    response = client.audio.speech.create(
+        model="tts-1",
+        voice="onyx",
+        input=text,
+        speed=1.0,
+    )
+    tmp = tempfile.mktemp(suffix=".mp3")
     try:
-        response = _claude.chat(text)
-        print_mycroft(response)
-        emit("response", {"text": response})
-        threading.Thread(target=speak, args=(response, _openai_key), daemon=True).start()
-    except Exception as e:
-        print_error(str(e))
-        emit("error", {"message": str(e)})
-
-
-def _open_brave():
-    time.sleep(1.5)
-    url = "http://localhost:5050"
-    for p in _BRAVE_PATHS:
-        if Path(p).exists():
-            subprocess.Popen([p, "--new-tab", url])
-            return
-    webbrowser.open(url)
+        with open(tmp, "wb") as f:
+            f.write(response.content)
+        pygame.mixer.music.load(tmp)
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            pygame.time.wait(50)
+    finally:
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
 
 
 def main():
     cfg = load_config()
 
     if not cfg.anthropic_api_key:
-        print_error("ANTHROPIC_API_KEY saknas. Lägg till den i .env-filen.")
+        print_error("ANTHROPIC_API_KEY saknas i .env-filen.")
         sys.exit(1)
-
     if not cfg.openai_api_key:
-        print_error("OPENAI_API_KEY saknas. Lägg till den i .env-filen.")
+        print_error("OPENAI_API_KEY saknas i .env-filen.")
         sys.exit(1)
 
-    global _claude, _openai_key
-    _claude     = ClaudeClient(cfg)
-    _openai_key = cfg.openai_api_key
+    claude = ClaudeClient(cfg)
 
     print_banner()
-    print_status("Server på http://localhost:5050")
-    print_status("Öppnar Brave...")
+    print_status("Tryck Enter för att tala. Ctrl+C för att avsluta.")
 
-    threading.Thread(target=_open_brave, daemon=True).start()
+    speak("Mycroft online. Redo att hjälpa.", cfg.openai_api_key)
 
-    socketio.run(app, host="127.0.0.1", port=5050, allow_unsafe_werkzeug=True)
+    while True:
+        try:
+            input()  # wait for Enter
+        except KeyboardInterrupt:
+            print_status("Avslutar. Hej då!")
+            sys.exit(0)
+
+        try:
+            wav  = record()
+            print_status("Transkriberar...")
+            text = transcribe(wav, cfg.openai_api_key)
+
+            if not text:
+                print_status("Hörde ingenting.")
+                continue
+
+            print_user(text)
+
+            if text.lower().strip() in ("hej då mycroft", "stäng av", "avsluta"):
+                speak("Stänger av. Ha det bra!", cfg.openai_api_key)
+                sys.exit(0)
+
+            print_status("Tänker...")
+            response = claude.chat(text)
+            print_mycroft(response)
+            speak(response, cfg.openai_api_key)
+
+        except KeyboardInterrupt:
+            print_status("Avslutar. Hej då!")
+            sys.exit(0)
+        except Exception as e:
+            print_error(str(e))
 
 
 if __name__ == "__main__":
