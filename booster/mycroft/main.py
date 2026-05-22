@@ -1,8 +1,8 @@
+import subprocess
 import sys
 import threading
 import webbrowser
 from pathlib import Path
-from datetime import date
 
 from flask import Flask, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -11,15 +11,23 @@ from mycroft.config import load_config
 from mycroft.brain.claude_client import ClaudeClient
 from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_status, print_error
 
-app = Flask(__name__, static_folder=str(Path(__file__).parent / "ui" / "static"))
-socketio = SocketIO(app, cors_allowed_origins="*")
+_STATIC = str(Path(__file__).parent / "ui" / "static")
 
-_claude = None
+app = Flask(__name__, static_folder=_STATIC)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+_claude: ClaudeClient | None = None
+
+_BRAVE_PATHS = [
+    r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+    r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+    str(Path.home() / r"AppData\Local\BraveSoftware\Brave-Browser\Application\brave.exe"),
+]
 
 
 @app.route("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    return send_from_directory(_STATIC, "index.html")
 
 
 @socketio.on("command")
@@ -30,10 +38,8 @@ def handle_command(data):
 
     print_user(text)
 
-    shutdown_phrases = ("goodbye mycroft", "shut down", "power off")
-    if text.lower() in shutdown_phrases:
+    if text.lower() in ("goodbye mycroft", "shut down", "power off"):
         emit("response", {"text": "Shutting down. See you later."})
-        socketio.stop()
         return
 
     print_status("Thinking...")
@@ -43,22 +49,16 @@ def handle_command(data):
         emit("response", {"text": response})
     except Exception as e:
         print_error(str(e))
-        emit("error", {"message": str(e)})
+        emit("error", {"message": f"Error: {e}"})
 
 
-def _open_browser():
+def _open_brave():
     import time
     time.sleep(1.5)
-    brave_paths = [
-        r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
-        r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
-        str(Path.home() / r"AppData\Local\BraveSoftware\Brave-Browser\Application\brave.exe"),
-    ]
     url = "http://localhost:5050"
-    for p in brave_paths:
+    for p in _BRAVE_PATHS:
         if Path(p).exists():
-            import subprocess
-            subprocess.Popen([p, url])
+            subprocess.Popen([p, "--new-tab", url])
             return
     webbrowser.open(url)
 
@@ -74,11 +74,17 @@ def main():
     _claude = ClaudeClient(cfg)
 
     print_banner()
-    print_status("Starting Mycroft on http://localhost:5050")
-    print_status("Opening Brave — say 'Hey Mycroft' to activate.")
+    print_status("Server running on http://localhost:5050")
+    print_status("Opening Brave...")
 
-    threading.Thread(target=_open_browser, daemon=True).start()
-    socketio.run(app, host="127.0.0.1", port=5050, allow_unsafe_werkzeug=True)
+    threading.Thread(target=_open_brave, daemon=True).start()
+
+    socketio.run(
+        app,
+        host="127.0.0.1",
+        port=5050,
+        allow_unsafe_werkzeug=True,
+    )
 
 
 if __name__ == "__main__":

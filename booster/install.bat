@@ -3,16 +3,15 @@ echo Installing Mycroft...
 
 python -m venv venv
 venv\Scripts\python.exe -m pip install --quiet --upgrade pip
-venv\Scripts\python.exe -m pip install pyaudio
-venv\Scripts\python.exe -m pip install -e .
+venv\Scripts\python.exe -m pip install --quiet -r requirements.txt
 
 if not exist .env (
     copy .env.example .env
     echo.
-    echo Edit .env and add your ANTHROPIC_API_KEY, then run mycroft.bat
+    echo Open .env in Notepad and add your ANTHROPIC_API_KEY, then run mycroft.bat
     notepad .env
 ) else (
     echo.
-    echo Already set up. Run mycroft.bat to start.
+    echo Done. Run mycroft.bat to start Mycroft.
 )
 pause

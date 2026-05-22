@@ -5,249 +5,355 @@
 <title>Mycroft</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
-    background: #0a0a0f;
-    color: #e0e0e0;
+    background: #080810;
+    color: #ddd;
     font-family: 'Courier New', monospace;
     height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    user-select: none;
   }
+
   #orb {
-    width: 120px; height: 120px;
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #1a6fff, #003399);
-    box-shadow: 0 0 30px #1a6fff55;
+    background: radial-gradient(circle at 38% 35%, #1a6fff, #002299);
+    box-shadow: 0 0 25px #1a6fff44;
+    margin-bottom: 36px;
     transition: all 0.3s ease;
-    margin-bottom: 40px;
+    cursor: pointer;
   }
-  #orb.listening { box-shadow: 0 0 60px #1a6fffaa; transform: scale(1.1); }
-  #orb.thinking  { background: radial-gradient(circle at 35% 35%, #ff9900, #cc6600); box-shadow: 0 0 60px #ff990088; animation: pulse 1s infinite; }
-  #orb.speaking  { background: radial-gradient(circle at 35% 35%, #00cc66, #006633); box-shadow: 0 0 60px #00cc6688; }
-  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+  #orb.idle     { box-shadow: 0 0 25px #1a6fff44; }
+  #orb.waiting  { box-shadow: 0 0 50px #1a6fff99; animation: breathe 2s ease-in-out infinite; }
+  #orb.listening{ box-shadow: 0 0 70px #1a6fffcc; transform: scale(1.1); }
+  #orb.thinking { background: radial-gradient(circle at 38% 35%, #ffaa00, #aa5500); box-shadow: 0 0 60px #ffaa0099; animation: pulse 0.8s ease-in-out infinite; }
+  #orb.speaking { background: radial-gradient(circle at 38% 35%, #00dd77, #005533); box-shadow: 0 0 60px #00dd7788; }
+
+  @keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+  @keyframes pulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+
   #status {
-    font-size: 14px;
-    color: #4a9eff;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 20px;
-    height: 20px;
-  }
-  #transcript {
     font-size: 13px;
-    color: #666;
-    max-width: 500px;
-    text-align: center;
-    min-height: 20px;
-    margin-bottom: 30px;
-    font-style: italic;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #4a9eff;
+    height: 18px;
+    margin-bottom: 18px;
   }
+
+  #heard {
+    font-size: 13px;
+    color: #555;
+    font-style: italic;
+    height: 18px;
+    margin-bottom: 24px;
+    max-width: 520px;
+    text-align: center;
+  }
+
   #response {
-    font-size: 15px;
+    font-size: 16px;
     color: #ccc;
     max-width: 600px;
     text-align: center;
-    line-height: 1.7;
-    min-height: 60px;
-    padding: 0 20px;
+    line-height: 1.8;
+    min-height: 80px;
+    padding: 0 24px;
   }
+
+  #start-screen {
+    position: fixed;
+    inset: 0;
+    background: #080810;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    cursor: pointer;
+  }
+
+  #start-screen h1 {
+    font-size: 28px;
+    letter-spacing: 8px;
+    color: #4a9eff;
+    margin-bottom: 16px;
+  }
+
+  #start-screen p {
+    font-size: 13px;
+    color: #444;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  #start-orb {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 35%, #1a6fff, #002299);
+    box-shadow: 0 0 40px #1a6fff77;
+    margin-bottom: 32px;
+    animation: breathe 2s ease-in-out infinite;
+  }
+
   #hint {
     position: fixed;
-    bottom: 20px;
+    bottom: 22px;
     font-size: 11px;
-    color: #333;
-    letter-spacing: 1px;
+    color: #2a2a3a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
   }
-  #error {
+
+  #error-box {
     position: fixed;
-    top: 20px;
-    background: #300;
-    color: #f66;
-    padding: 10px 20px;
+    top: 18px;
+    background: #2a0000;
+    color: #ff6666;
+    border: 1px solid #660000;
+    padding: 10px 22px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
     display: none;
+    max-width: 500px;
+    text-align: center;
   }
 </style>
 </head>
 <body>
 
-<div id="error"></div>
-<div id="orb"></div>
-<div id="status">INITIALIZING</div>
-<div id="transcript"></div>
+<!-- Click to start overlay — unlocks browser audio -->
+<div id="start-screen" onclick="onStart()">
+  <div id="start-orb"></div>
+  <h1>MYCROFT</h1>
+  <p>Click to activate</p>
+</div>
+
+<div id="error-box"></div>
+<div id="orb" class="idle"></div>
+<div id="status">READY</div>
+<div id="heard"></div>
 <div id="response"></div>
 <div id="hint">SAY "HEY MYCROFT" TO ACTIVATE</div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-const socket = io();
-const orb = document.getElementById('orb');
-const status = document.getElementById('status');
-const transcript = document.getElementById('transcript');
-const response = document.getElementById('response');
-const errorBox = document.getElementById('error');
+// ── State ──────────────────────────────────────────────────────────
+const orb      = document.getElementById('orb');
+const statusEl = document.getElementById('status');
+const heardEl  = document.getElementById('heard');
+const respEl   = document.getElementById('response');
+const errBox   = document.getElementById('error-box');
 
+let socket;
 let recognition;
-let inSession = false;
-let synth = window.speechSynthesis;
+let cmdRecognition;
+let inSession   = false;
+let started     = false;
+let voices      = [];
 
-function setOrb(state, msg) {
-  orb.className = state;
-  status.textContent = msg;
+// ── Start (requires user click to unlock audio) ────────────────────
+function onStart() {
+  document.getElementById('start-screen').style.display = 'none';
+  started = true;
+  initSocket();
+  loadVoices();
+  startWakeWord();
+}
+
+// ── Socket.IO ─────────────────────────────────────────────────────
+function initSocket() {
+  socket = io('http://localhost:5050', {
+    transports: ['websocket', 'polling'],
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+  });
+
+  socket.on('connect', () => setState('idle', 'READY'));
+  socket.on('disconnect', () => setState('idle', 'RECONNECTING...'));
+
+  socket.on('response', (data) => {
+    respEl.textContent = data.text;
+    setState('speaking', 'SPEAKING');
+    speak(data.text, () => {
+      inSession = false;
+      setState('waiting', 'LISTENING FOR WAKE WORD');
+      startWakeWord();
+    });
+  });
+
+  socket.on('error', (data) => {
+    showError(data.message);
+    inSession = false;
+    setState('waiting', 'LISTENING FOR WAKE WORD');
+    startWakeWord();
+  });
+}
+
+// ── UI helpers ────────────────────────────────────────────────────
+function setState(cls, msg) {
+  orb.className = cls;
+  statusEl.textContent = msg;
 }
 
 function showError(msg) {
-  errorBox.style.display = 'block';
-  errorBox.textContent = msg;
-  setTimeout(() => errorBox.style.display = 'none', 5000);
+  errBox.textContent = msg;
+  errBox.style.display = 'block';
+  setTimeout(() => errBox.style.display = 'none', 6000);
 }
 
-// ── Speech Recognition ──────────────────────────────────────────────
-function startWakeWordListening() {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    showError('Speech recognition not supported. Use Brave or Chrome.');
+// ── TTS ──────────────────────────────────────────────────────────
+function loadVoices() {
+  voices = speechSynthesis.getVoices();
+  speechSynthesis.onvoiceschanged = () => {
+    voices = speechSynthesis.getVoices();
+  };
+}
+
+function speak(text, onDone) {
+  speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang  = 'en-US';
+  utt.rate  = 1.0;
+  utt.pitch = 0.85;
+
+  // prefer a deeper male voice
+  const preferred = voices.find(v =>
+    v.lang.startsWith('en') && (
+      v.name.includes('David') ||
+      v.name.includes('Mark')  ||
+      v.name.includes('Guy')   ||
+      v.name.includes('Male')
+    )
+  ) || voices.find(v => v.lang.startsWith('en'));
+  if (preferred) utt.voice = preferred;
+
+  utt.onend   = onDone || (() => {});
+  utt.onerror = onDone || (() => {});
+  speechSynthesis.speak(utt);
+}
+
+// ── Wake word recognition ─────────────────────────────────────────
+function startWakeWord() {
+  if (!started || inSession) return;
+  stopRecognition(recognition);
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    showError('Speech recognition not available. Use Brave or Chrome.');
     return;
   }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
 
-  recognition.onstart = () => setOrb('', 'LISTENING FOR WAKE WORD');
+  recognition = new SR();
+  recognition.continuous    = true;
+  recognition.interimResults = true;
+  recognition.lang          = 'en-US';
+  recognition.maxAlternatives = 1;
 
   recognition.onresult = (e) => {
     if (inSession) return;
-    let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript.toLowerCase();
-      if (e.results[i].isFinal) {
-        if (t.includes('mycroft')) {
-          triggerSession();
-          return;
-        }
-      } else {
-        interim = t;
-        if (interim.includes('mycroft')) {
-          triggerSession();
-          return;
-        }
+      if (t.includes('mycroft')) {
+        triggerWake();
+        return;
       }
     }
   };
 
   recognition.onerror = (e) => {
-    if (e.error !== 'no-speech' && e.error !== 'aborted') showError('Mic error: ' + e.error);
+    if (e.error === 'not-allowed') {
+      showError('Microphone blocked. Click the lock icon in the address bar and allow mic access.');
+    }
+    // 'no-speech' and 'aborted' are normal — ignore them
   };
 
+  // Chrome stops continuous recognition after ~60s — restart it
   recognition.onend = () => {
-    if (!inSession) setTimeout(() => recognition.start(), 300);
+    if (!inSession && started) {
+      setTimeout(startWakeWord, 300);
+    }
   };
 
   recognition.start();
+  setState('waiting', 'LISTENING FOR WAKE WORD');
 }
 
-function triggerSession() {
+function triggerWake() {
   if (inSession) return;
   inSession = true;
-  recognition.stop();
-  transcript.textContent = '';
-  response.textContent = '';
+  stopRecognition(recognition);
+  heardEl.textContent = '';
+  respEl.textContent  = '';
   listenForCommand();
 }
 
+// ── Command recognition ───────────────────────────────────────────
 function listenForCommand() {
-  setOrb('listening', 'LISTENING');
-  speak_local('Yeah?', () => {
+  setState('listening', 'LISTENING');
+
+  speak('Yeah?', () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const cmd = new SR();
-    cmd.lang = 'en-US';
-    cmd.interimResults = true;
-    cmd.maxAlternatives = 1;
+    cmdRecognition = new SR();
+    cmdRecognition.lang            = 'en-US';
+    cmdRecognition.interimResults  = true;
+    cmdRecognition.maxAlternatives = 1;
 
-    cmd.onresult = (e) => {
-      let text = '';
+    let finalText = '';
+
+    cmdRecognition.onresult = (e) => {
+      let interim = '';
       for (let i = 0; i < e.results.length; i++) {
-        text = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalText += e.results[i][0].transcript;
+        } else {
+          interim = e.results[i][0].transcript;
+        }
       }
-      transcript.textContent = '"' + text + '"';
+      heardEl.textContent = '"' + (finalText || interim) + '"';
     };
 
-    cmd.onspeechend = () => cmd.stop();
+    cmdRecognition.onspeechend = () => cmdRecognition.stop();
 
-    cmd.onend = () => {
-      const final = transcript.textContent.replace(/^"|"$/g, '');
-      if (final) {
-        sendCommand(final);
+    cmdRecognition.onend = () => {
+      const text = finalText.trim();
+      if (text) {
+        sendCommand(text);
       } else {
-        transcript.textContent = '';
+        heardEl.textContent = '';
         inSession = false;
-        startWakeWordListening();
+        startWakeWord();
       }
     };
 
-    cmd.onerror = () => {
+    cmdRecognition.onerror = (e) => {
+      showError('Mic error during command: ' + e.error);
       inSession = false;
-      startWakeWordListening();
+      startWakeWord();
     };
 
-    cmd.start();
+    cmdRecognition.start();
   });
 }
 
 function sendCommand(text) {
-  setOrb('thinking', 'THINKING');
-  transcript.textContent = '"' + text + '"';
+  setState('thinking', 'THINKING');
+  heardEl.textContent = '"' + text + '"';
   socket.emit('command', { text: text });
 }
 
-// ── Socket events ───────────────────────────────────────────────────
-socket.on('response', (data) => {
-  response.textContent = data.text;
-  setOrb('speaking', 'SPEAKING');
-  speak_local(data.text, () => {
-    inSession = false;
-    setOrb('', 'READY');
-    startWakeWordListening();
-  });
-});
-
-socket.on('error', (data) => {
-  showError(data.message);
-  inSession = false;
-  startWakeWordListening();
-});
-
-socket.on('connect', () => {
-  setOrb('', 'CONNECTED');
-  startWakeWordListening();
-});
-
-// ── TTS ─────────────────────────────────────────────────────────────
-function speak_local(text, callback) {
-  if (synth.speaking) synth.cancel();
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 1.0;
-  utt.pitch = 0.9;
-  utt.volume = 1.0;
-  // prefer a deeper/masculine voice if available
-  const voices = synth.getVoices();
-  const preferred = voices.find(v => v.name.includes('David') || v.name.includes('Mark') || (v.lang === 'en-US' && v.name.toLowerCase().includes('male')));
-  if (preferred) utt.voice = preferred;
-  utt.onend = callback || (() => {});
-  utt.onerror = callback || (() => {});
-  synth.speak(utt);
+// ── Helpers ───────────────────────────────────────────────────────
+function stopRecognition(r) {
+  if (r) {
+    try { r.abort(); } catch(_) {}
+  }
 }
-
-// Load voices async
-if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => {};
-
-setOrb('', 'READY');
-startWakeWordListening();
 </script>
 </body>
 </html>
