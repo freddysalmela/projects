@@ -1,5 +1,6 @@
+import subprocess
 import webbrowser
-from typing import Any
+from pathlib import Path
 
 from ddgs import DDGS
 from youtubesearchpython import VideosSearch
@@ -37,6 +38,24 @@ def youtube_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
         return [{"title": "YouTube search error", "url": "", "channel": "", "duration": "", "error": str(e)}]
 
 
+_BRAVE_PATHS = [
+    r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+    r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+    str(Path.home() / r"AppData\Local\BraveSoftware\Brave-Browser\Application\brave.exe"),
+]
+
+
+def _find_brave() -> str | None:
+    for p in _BRAVE_PATHS:
+        if Path(p).exists():
+            return p
+    return None
+
+
 def open_url(url: str) -> str:
-    webbrowser.open(url)
+    brave = _find_brave()
+    if brave:
+        subprocess.Popen([brave, url])
+    else:
+        webbrowser.open(url)
     return f"Opened {url} in browser."
