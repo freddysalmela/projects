@@ -1,5 +1,5 @@
-from booster.capabilities.search import web_search, youtube_search, open_url
-from booster.capabilities.calculator import evaluate_expression, geometry, GEOMETRY_FORMULAS
+from mycroft.capabilities.search import web_search, youtube_search, open_url
+from mycroft.capabilities.calculator import evaluate_expression, geometry, GEOMETRY_FORMULAS
 
 TOOLS = [
     {

@@ -2,7 +2,7 @@ import re
 import tempfile
 import os
 
-from booster.config import Config
+from mycroft.config import Config
 
 
 def _strip_markdown(text: str) -> str:

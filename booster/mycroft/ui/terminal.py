@@ -7,7 +7,7 @@ console = Console()
 def print_banner():
     console.print()
     console.print("[bold cyan]╔══════════════════════════════════════╗[/]")
-    console.print("[bold cyan]║       BOOSTER  —  GARAGE AI          ║[/]")
+    console.print("[bold cyan]║       MYCROFT  —  GARAGE AI          ║[/]")
     console.print("[bold cyan]╚══════════════════════════════════════╝[/]")
     console.print()
 
@@ -16,8 +16,8 @@ def print_user(text: str):
     console.print(f"[bold yellow]YOU:[/] {text}")
 
 
-def print_booster(text: str):
-    console.print(f"[bold cyan]BOOSTER:[/] {text}")
+def print_mycroft(text: str):
+    console.print(f"[bold cyan]MYCROFT:[/] {text}")
 
 
 def print_status(text: str):

@@ -10,13 +10,13 @@ REQUIRES = [
 ]
 
 setup(
-    name="booster",
+    name="mycroft",
     version="0.1.0",
     packages=find_packages(),
     install_requires=REQUIRES,
     entry_points={
         "console_scripts": [
-            "booster=booster.main:main",
+            "mycroft=mycroft.main:main",
         ],
     },
     python_requires=">=3.11",

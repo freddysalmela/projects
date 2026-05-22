@@ -34,27 +34,27 @@ class Config:
     search_max_results: int = 5
 
     save_plans: bool = True
-    plans_directory: str = "~/booster_plans"
+    plans_directory: str = "~/mycroft_plans"
 
 
 def load_config() -> Config:
     raw = _load_yaml()
-    booster = raw.get("booster", {})
+    booster = raw.get("mycroft", {})
     audio = raw.get("audio", {})
     search = raw.get("search", {})
     planner = raw.get("planner", {})
 
     cfg = Config(
-        model=os.environ.get("BOOSTER_MODEL", booster.get("model", "claude-sonnet-4-6")),
+        model=os.environ.get("MYCROFT_MODEL", booster.get("model", "claude-sonnet-4-6")),
         max_history_turns=int(booster.get("max_history_turns", 20)),
-        stt_backend=os.environ.get("BOOSTER_STT", audio.get("stt_backend", "google")),
-        tts_backend=os.environ.get("BOOSTER_TTS", audio.get("tts_backend", "gtts")),
+        stt_backend=os.environ.get("MYCROFT_STT", audio.get("stt_backend", "google")),
+        tts_backend=os.environ.get("MYCROFT_TTS", audio.get("tts_backend", "gtts")),
         whisper_model=audio.get("whisper_model", "tiny"),
-        wake_mode=os.environ.get("BOOSTER_WAKE_MODE", audio.get("wake_mode", "wake_word")),
+        wake_mode=os.environ.get("MYCROFT_WAKE_MODE", audio.get("wake_mode", "wake_word")),
         speech_timeout=int(audio.get("speech_timeout", 5)),
         pause_threshold=float(audio.get("pause_threshold", 0.8)),
         search_max_results=int(search.get("max_results", 5)),
         save_plans=bool(planner.get("save_plans", True)),
-        plans_directory=planner.get("plans_directory", "~/booster_plans"),
+        plans_directory=planner.get("plans_directory", "~/mycroft_plans"),
     )
     return cfg

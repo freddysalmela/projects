@@ -2,11 +2,11 @@ from datetime import date
 
 import anthropic
 
-from booster.brain.tools import TOOLS, dispatch_tool
-from booster.config import Config
-from booster.ui.terminal import print_tool_use
+from mycroft.brain.tools import TOOLS, dispatch_tool
+from mycroft.config import Config
+from mycroft.ui.terminal import print_tool_use
 
-SYSTEM_PROMPT = """You are Booster, a garage workshop AI assistant. You help with research, \
+SYSTEM_PROMPT = """You are Mycroft, a garage workshop AI assistant. You help with research, \
 calculations, geometry, YouTube tutorials, and project planning.
 
 Personality: Confident, energetic, straight-talking. You have a workshop mentality — \

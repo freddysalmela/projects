@@ -1,7 +1,7 @@
 import speech_recognition as sr
 
-from booster.config import Config
-from booster.ui.terminal import print_status, print_error
+from mycroft.config import Config
+from mycroft.ui.terminal import print_status, print_error
 
 _PYAUDIO_HINT = (
     "PyAudio is not installed.\n"

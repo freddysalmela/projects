@@ -1,12 +1,12 @@
 import sys
 import threading
 
-from booster.config import load_config
-from booster.brain.claude_client import ClaudeClient
-from booster.audio.speaker import Speaker
-from booster.audio.listener import Listener
-from booster.audio.wake_word import WakeWordDetector
-from booster.ui.terminal import print_banner, print_user, print_booster, print_status, print_error
+from mycroft.config import load_config
+from mycroft.brain.claude_client import ClaudeClient
+from mycroft.audio.speaker import Speaker
+from mycroft.audio.listener import Listener
+from mycroft.audio.wake_word import WakeWordDetector
+from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_status, print_error
 
 _lock = threading.Lock()
 
@@ -25,7 +25,7 @@ def main():
     listener = Listener(cfg)
 
     listener.calibrate()
-    speaker.speak("Booster online. Ready to work.")
+    speaker.speak("Mycroft online. Ready to work.")
 
     def handle_session():
         if not _lock.acquire(blocking=False):
@@ -40,27 +40,27 @@ def main():
 
             print_user(user_input)
 
-            if user_input.lower().strip() in ("goodbye booster", "shut down", "exit", "quit", "power off"):
+            if user_input.lower().strip() in ("goodbye mycroft", "shut down", "exit", "quit", "power off"):
                 speaker.speak("Shutting down. Stay safe out there.")
                 wake_detector.stop()
                 sys.exit(0)
 
             print_status("Thinking...")
             response = claude.chat(user_input)
-            print_booster(response)
+            print_mycroft(response)
             speaker.speak(response)
         except Exception as e:
             print_error(str(e))
         finally:
             _lock.release()
 
-    wake_detector = WakeWordDetector(on_wake=handle_session, trigger="booster")
+    wake_detector = WakeWordDetector(on_wake=handle_session, trigger="mycroft")
     wake_detector.start()
 
     try:
         wake_detector._thread.join()
     except KeyboardInterrupt:
-        print_status("\nShutting down Booster. See you later.")
+        print_status("\nShutting down Mycroft. See you later.")
         wake_detector.stop()
 
 

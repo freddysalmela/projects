@@ -4,16 +4,16 @@ from typing import Callable
 
 import speech_recognition as sr
 
-from booster.ui.terminal import print_status, print_error
+from mycroft.ui.terminal import print_status, print_error
 
 
 class WakeWordDetector:
     """
-    Listens continuously for the phrase "booster" using short Google STT bursts.
+    Listens continuously for the phrase "mycroft" using short Google STT bursts.
     Falls back to push-to-talk (Enter key) if the microphone is unavailable.
     """
 
-    def __init__(self, on_wake: Callable, trigger: str = "booster"):
+    def __init__(self, on_wake: Callable, trigger: str = "mycroft"):
         self.on_wake = on_wake
         self.trigger = trigger.lower()
         self._running = False
@@ -31,7 +31,7 @@ class WakeWordDetector:
         self._running = False
 
     def _listen_loop(self):
-        print_status(f'Say "Hey Booster" to activate. Ctrl+C to quit.')
+        print_status(f'Say "Hey Mycroft" to activate. Ctrl+C to quit.')
         while self._running:
             try:
                 with sr.Microphone() as source:
