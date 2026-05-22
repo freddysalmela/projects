@@ -1,17 +1,18 @@
 import base64
-import os
-import tempfile
 
 
-def speak_to_base64(text: str, lang: str = "sv") -> str | None:
-    """Generate speech with gTTS, return base64-encoded MP3. Returns None on failure."""
+def speak_to_base64(text: str, openai_api_key: str) -> str | None:
+    """Generate speech with OpenAI TTS. Returns base64-encoded MP3."""
     try:
-        from gtts import gTTS
-        tmp = tempfile.mktemp(suffix=".mp3")
-        gTTS(text=text, lang=lang, slow=False).save(tmp)
-        with open(tmp, "rb") as f:
-            data = base64.b64encode(f.read()).decode("utf-8")
-        os.remove(tmp)
-        return data
-    except Exception:
+        import openai
+        client = openai.OpenAI(api_key=openai_api_key)
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice="onyx",   # deep, clear voice — works well in Swedish
+            input=text,
+            speed=1.0,
+        )
+        return base64.b64encode(response.content).decode("utf-8")
+    except Exception as e:
+        print(f"TTS error: {e}")
         return None

@@ -79,7 +79,7 @@ def handle_command(data):
         from mycroft.audio.tts import speak_to_base64
         response = _claude.chat(text)
         print_mycroft(response)
-        audio = speak_to_base64(response, lang="sv")
+        audio = speak_to_base64(response, openai_api_key=_openai_key)
         emit("response", {"text": response, "audio": audio})
     except Exception as e:
         print_error(str(e))
