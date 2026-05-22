@@ -17,9 +17,8 @@ def _strip_markdown(text: str) -> str:
 class Speaker:
     def __init__(self, cfg: Config):
         self.backend = cfg.tts_backend
-        self._init_backend()
-
-    def _init_backend(self):
+        # Always init pyttsx3 so the fallback is always available
+        self._init_pyttsx3()
         if self.backend == "gtts":
             try:
                 import pygame
@@ -27,9 +26,6 @@ class Speaker:
                 self._pygame = pygame
             except Exception:
                 self.backend = "pyttsx3"
-                self._init_pyttsx3()
-        elif self.backend == "pyttsx3":
-            self._init_pyttsx3()
 
     def _init_pyttsx3(self):
         import pyttsx3

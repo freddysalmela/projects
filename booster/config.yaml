@@ -4,7 +4,7 @@ booster:
 
 audio:
   stt_backend: google       # google | whisper
-  tts_backend: gtts         # gtts | pyttsx3
+  tts_backend: pyttsx3         # gtts | pyttsx3
   whisper_model: tiny       # tiny | base | small
   wake_mode: wake_word      # wake_word | push_to_talk
   speech_timeout: 5
