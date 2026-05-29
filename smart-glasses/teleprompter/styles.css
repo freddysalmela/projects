@@ -8,21 +8,21 @@ body {
   background: #0a0a0f;
   color: #e8e8ff;
   font-family: 'Georgia', serif;
-  min-height: 100vh;
+  /* Ray-Ban Display: fixed 600x600 canvas */
+  width: 600px;
+  height: 600px;
+  overflow: hidden;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
 }
 
 /* ── Setup Panel ── */
 #setup-panel {
-  width: 560px;
-  max-width: 96vw;
-  background: #12121a;
-  border: 1px solid #2a2a40;
-  border-radius: 12px;
+  width: 600px;
+  height: 600px;
+  background: #0a0a0f;
+  overflow-y: auto;
   padding: 28px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
 }
 
 #setup-header {

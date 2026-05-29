@@ -1,0 +1,15 @@
+{
+  "name": "Teleprompter",
+  "short_name": "Teleprompter",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "display": "fullscreen",
+  "background_color": "#0a0a0f",
+  "theme_color": "#a0a0ff",
+  "permissions": ["microphone"],
+  "meta_wearable": {
+    "target_display": "ray-ban-display",
+    "viewport": { "width": 600, "height": 600 },
+    "interaction": ["touch", "voice"]
+  }
+}

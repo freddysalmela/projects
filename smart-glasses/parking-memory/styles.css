@@ -8,24 +8,24 @@ body {
   background: #050508;
   color: #00e0a0;
   font-family: 'Courier New', monospace;
-  min-height: 100vh;
+  /* Ray-Ban Display: fixed 600x600 canvas */
+  width: 600px;
+  height: 600px;
+  overflow: hidden;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
 }
 
 /* ── HUD Frame ── */
 #hud {
-  width: 360px;
-  max-width: 96vw;
+  width: 600px;
+  height: 600px;
   background: #070a0c;
   border: 1px solid #00503a;
-  border-radius: 16px;
   overflow: hidden;
-  box-shadow:
-    0 0 40px #00e0a011,
-    inset 0 0 60px #000;
   position: relative;
+  flex: 1;
 }
 
 /* Simulated lens glare */
