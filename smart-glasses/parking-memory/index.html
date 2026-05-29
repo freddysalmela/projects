@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parking Memory — Smart Glasses Prototype</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="hud">
+    <div id="status-bar">
+      <span id="gps-indicator" class="indicator">GPS</span>
+      <span id="app-name">PARKING MEMORY</span>
+      <span id="time"></span>
+    </div>
+
+    <div id="main-view">
+      <!-- Save state -->
+      <div id="view-idle" class="view active">
+        <p class="hint">No parking location saved</p>
+        <button id="btn-save" class="hud-btn primary">Save Parking Location</button>
+        <p class="sub-hint">Tap when you leave your car</p>
+      </div>
+
+      <!-- Saved state -->
+      <div id="view-saved" class="view">
+        <div id="saved-info">
+          <div class="label">PARKED</div>
+          <div id="saved-address" class="address">Acquiring address…</div>
+          <div id="saved-time" class="meta"></div>
+        </div>
+        <div id="nav-panel">
+          <div id="compass-ring">
+            <div id="compass-arrow">▲</div>
+          </div>
+          <div id="distance-display">
+            <span id="distance-value">—</span>
+            <span id="distance-unit">m</span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="btn-navigate" class="hud-btn primary">Navigate Back</button>
+          <button id="btn-clear" class="hud-btn secondary">Clear</button>
+        </div>
+      </div>
+
+      <!-- Navigating state -->
+      <div id="view-navigating" class="view">
+        <div class="label">NAVIGATING TO CAR</div>
+        <div id="nav-compass-ring" class="big-compass">
+          <div id="nav-compass-arrow">▲</div>
+          <div id="nav-compass-label">N</div>
+        </div>
+        <div id="nav-distance-display">
+          <span id="nav-distance-value">—</span>
+          <span id="nav-distance-unit">m</span>
+        </div>
+        <div id="arrival-banner" class="hidden">You have arrived!</div>
+        <button id="btn-stop-nav" class="hud-btn secondary">Stop Navigation</button>
+      </div>
+    </div>
+
+    <div id="toast" class="hidden"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,295 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #050508;
+  color: #00e0a0;
+  font-family: 'Courier New', monospace;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── HUD Frame ── */
+#hud {
+  width: 360px;
+  max-width: 96vw;
+  background: #070a0c;
+  border: 1px solid #00503a;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 0 40px #00e0a011,
+    inset 0 0 60px #000;
+  position: relative;
+}
+
+/* Simulated lens glare */
+#hud::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00e0a022, #00e0a044, #00e0a022, transparent);
+}
+
+/* ── Status Bar ── */
+#status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: #050a08;
+  border-bottom: 1px solid #00402e;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #00905a;
+}
+
+.indicator {
+  font-size: 9px;
+  border: 1px solid #00905a;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+.indicator.active {
+  color: #00e0a0;
+  border-color: #00e0a0;
+  box-shadow: 0 0 6px #00e0a044;
+}
+
+#app-name {
+  letter-spacing: 4px;
+  font-size: 10px;
+}
+
+#time {
+  font-size: 11px;
+  color: #00705a;
+}
+
+/* ── Main View ── */
+#main-view {
+  min-height: 280px;
+  padding: 24px 20px;
+  position: relative;
+}
+
+.view {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.view.active {
+  display: flex;
+}
+
+/* ── Idle View ── */
+.hint {
+  font-size: 13px;
+  color: #006050;
+  letter-spacing: 1px;
+}
+
+.sub-hint {
+  font-size: 11px;
+  color: #004030;
+  letter-spacing: 1px;
+}
+
+/* ── Saved View ── */
+#saved-info {
+  width: 100%;
+  background: #050f0c;
+  border: 1px solid #00402e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #00905a;
+  margin-bottom: 6px;
+}
+
+.address {
+  font-size: 14px;
+  color: #00e0a0;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.meta {
+  font-size: 10px;
+  color: #006050;
+  letter-spacing: 1px;
+}
+
+/* ── Compass ── */
+#nav-panel {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+#compass-ring,
+#nav-compass-ring {
+  width: 80px;
+  height: 80px;
+  border: 2px solid #00503a;
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px #00e0a011;
+}
+
+#nav-compass-ring.big-compass {
+  width: 140px;
+  height: 140px;
+  border-color: #00805a;
+  box-shadow: 0 0 30px #00e0a022;
+}
+
+#compass-arrow,
+#nav-compass-arrow {
+  font-size: 28px;
+  color: #00e0a0;
+  line-height: 1;
+  text-shadow: 0 0 12px #00e0a0;
+  transition: transform 0.5s ease;
+}
+
+#nav-compass-arrow {
+  font-size: 48px;
+}
+
+#nav-compass-label {
+  position: absolute;
+  top: 8px;
+  font-size: 11px;
+  color: #00604a;
+  letter-spacing: 2px;
+}
+
+#distance-display,
+#nav-distance-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#distance-value,
+#nav-distance-value {
+  font-size: 32px;
+  color: #00e0a0;
+  line-height: 1;
+  text-shadow: 0 0 16px #00e0a033;
+}
+
+#nav-distance-value {
+  font-size: 56px;
+}
+
+#distance-unit,
+#nav-distance-unit {
+  font-size: 12px;
+  color: #00705a;
+  letter-spacing: 2px;
+}
+
+/* ── Navigate View ── */
+#view-navigating {
+  gap: 18px;
+}
+
+#arrival-banner {
+  font-size: 18px;
+  color: #00e0a0;
+  letter-spacing: 2px;
+  animation: glow-pulse 1s infinite;
+  border: 1px solid #00e0a0;
+  padding: 8px 20px;
+  border-radius: 4px;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 10px #00e0a033; }
+  50% { box-shadow: 0 0 24px #00e0a066; }
+}
+
+/* ── Buttons ── */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.hud-btn {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 9px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.15s;
+  flex: 1;
+}
+
+.hud-btn.primary {
+  background: #081a14;
+  border-color: #00805a;
+  color: #00e0a0;
+}
+
+.hud-btn.primary:hover {
+  background: #0a2019;
+  box-shadow: 0 0 14px #00e0a022;
+}
+
+.hud-btn.secondary {
+  background: transparent;
+  border-color: #003020;
+  color: #006050;
+}
+
+.hud-btn.secondary:hover {
+  border-color: #006050;
+  color: #00a070;
+}
+
+/* ── Toast ── */
+#toast {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #081a14;
+  border: 1px solid #00805a;
+  border-radius: 4px;
+  padding: 7px 18px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #00e0a0;
+  white-space: nowrap;
+  box-shadow: 0 0 14px #00e0a022;
+}
+
+.hidden {
+  display: none !important;
+}
