@@ -1,0 +1,337 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0a0a0f;
+  color: #e8e8ff;
+  font-family: 'Georgia', serif;
+  /* Ray-Ban Display: fixed 600x600 canvas */
+  width: 600px;
+  height: 600px;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ── Setup Panel ── */
+#setup-panel {
+  width: 600px;
+  height: 600px;
+  background: #0a0a0f;
+  overflow-y: auto;
+  padding: 28px;
+}
+
+#setup-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #2a2a40;
+  padding-bottom: 16px;
+}
+
+.brand {
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  letter-spacing: 4px;
+  color: #a0a0ff;
+}
+
+.sub {
+  font-size: 12px;
+  color: #505070;
+  letter-spacing: 1px;
+}
+
+#script-input {
+  width: 100%;
+  height: 200px;
+  background: #0a0a12;
+  border: 1px solid #2a2a40;
+  border-radius: 6px;
+  color: #c8c8e8;
+  font-family: 'Georgia', serif;
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 14px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#script-input:focus {
+  border-color: #5050a0;
+}
+
+#controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #7070a0;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
+.control-group label {
+  width: 100px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.control-group input[type="range"] {
+  flex: 1;
+  accent-color: #6060c0;
+  cursor: pointer;
+}
+
+.control-group span {
+  width: 48px;
+  text-align: right;
+  color: #a0a0d0;
+  font-size: 13px;
+}
+
+.toggle-row {
+  align-items: center;
+}
+
+.toggle-hint {
+  font-size: 11px;
+  color: #404060;
+  letter-spacing: 0.5px;
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  flex: 1;
+}
+
+.toggle-btn {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 4px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.2s;
+  min-width: 48px;
+}
+
+.toggle-btn.off {
+  background: transparent;
+  border-color: #3a3a50;
+  color: #404060;
+}
+
+.toggle-btn.on {
+  background: #20203a;
+  border-color: #6060c0;
+  color: #a0a0ff;
+}
+
+.start-btn {
+  width: 100%;
+  padding: 14px;
+  background: #20204a;
+  border: 1px solid #5050a0;
+  border-radius: 6px;
+  color: #a0a0ff;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.start-btn:hover {
+  background: #28286a;
+  box-shadow: 0 0 20px #4040a033;
+}
+
+/* ── HUD Panel ── */
+#hud-panel {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+#hud-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: #080810;
+  border-bottom: 1px solid #1a1a2a;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #4040a0;
+}
+
+#hud-mode {
+  color: #6060c0;
+}
+
+#teleprompter-window {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  padding: 0 60px;
+}
+
+#focus-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3030a066, #3030a066, transparent);
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Fade top and bottom */
+#teleprompter-window::before,
+#teleprompter-window::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 30%;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#teleprompter-window::before {
+  top: 0;
+  background: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
+#teleprompter-window::after {
+  bottom: 0;
+  background: linear-gradient(to top, #000 0%, transparent 100%);
+}
+
+#script-display {
+  position: absolute;
+  width: calc(100% - 120px);
+  padding: 50vh 0;
+  line-height: 1.8;
+  color: #d0d0f0;
+  will-change: transform;
+}
+
+#script-display p {
+  margin-bottom: 1.5em;
+  transition: color 0.3s;
+}
+
+#script-display p.active-para {
+  color: #fff;
+}
+
+#script-display p.past-para {
+  color: #303050;
+}
+
+#hud-controls {
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #080810;
+  border-top: 1px solid #1a1a2a;
+  justify-content: center;
+}
+
+.hud-btn {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 8px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.15s;
+}
+
+.hud-btn.primary {
+  background: #20204a;
+  border-color: #5050a0;
+  color: #a0a0ff;
+}
+
+.hud-btn.primary:hover {
+  background: #28286a;
+}
+
+.hud-btn.secondary {
+  background: transparent;
+  border-color: #2a2a40;
+  color: #5050a0;
+}
+
+.hud-btn.secondary:hover {
+  border-color: #5050a0;
+  color: #8080c0;
+}
+
+.hud-btn.danger {
+  background: transparent;
+  border-color: #402020;
+  color: #804040;
+}
+
+.hud-btn.danger:hover {
+  border-color: #a04040;
+  color: #c06060;
+}
+
+#voice-indicator {
+  position: absolute;
+  top: 50px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #6060c0;
+}
+
+#voice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6060c0;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.hidden {
+  display: none !important;
+}

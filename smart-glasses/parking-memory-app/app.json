@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Parking Memory",
+    "slug": "parking-memory",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#050508"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.parkingmemory.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Parking Memory needs your location to save where you parked and navigate you back.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Parking Memory needs your location to save where you parked and navigate you back."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#050508"
+      },
+      "package": "com.parkingmemory.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Parking Memory needs your location to save where you parked and navigate you back."
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Parking Memory",
+  "short_name": "ParkingMemory",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "display": "fullscreen",
+  "background_color": "#050508",
+  "theme_color": "#00e0a0",
+  "permissions": ["location", "sensors"],
+  "meta_wearable": {
+    "target_display": "ray-ban-display",
+    "viewport": { "width": 600, "height": 600 },
+    "interaction": ["touch", "voice"]
+  }
+}

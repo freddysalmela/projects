@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Ray-Ban Display: 600x600px fixed viewport -->
+  <meta name="viewport" content="width=600, height=600, initial-scale=1.0, user-scalable=no" />
+  <meta name="meta-wearable-app" content="true" />
+  <meta name="meta-wearable-display" content="fullscreen" />
+  <title>Teleprompter</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Script editor (setup mode) -->
+  <div id="setup-panel">
+    <div id="setup-header">
+      <span class="brand">TELEPROMPTER</span>
+      <span class="sub">Smart Glasses Prototype</span>
+    </div>
+
+    <textarea id="script-input" placeholder="Paste or type your script here…">Welcome everyone. Thank you for joining us today.
+
+I want to talk about three key topics. First, the current state of our industry. Second, the challenges we face moving forward. And third, the opportunities that lie ahead.
+
+Let's start with where we are today. The landscape has shifted dramatically over the past year. New technologies are reshaping how we work, communicate, and create value.
+
+The teams that adapt quickly will be the ones that thrive. Those who resist change will find themselves falling behind.
+
+Now, what does this mean for us specifically? It means we need to invest in learning, stay curious, and embrace experimentation.
+
+Our second topic is the challenges. Change is never easy. There will be friction. There will be uncertainty. But every challenge is also a signal that something important is happening.
+
+And finally — opportunity. The same forces creating disruption are also opening doors that did not exist before. Our goal is to walk through those doors together.
+
+Thank you.</textarea>
+
+    <div id="controls">
+      <div class="control-group">
+        <label>Scroll Speed</label>
+        <input type="range" id="speed-slider" min="10" max="120" value="40" />
+        <span id="speed-label">40</span>
+      </div>
+      <div class="control-group">
+        <label>Font Size</label>
+        <input type="range" id="font-slider" min="20" max="72" value="36" />
+        <span id="font-label">36px</span>
+      </div>
+      <div class="control-group toggle-row">
+        <label>Voice Sync</label>
+        <button id="btn-voice-toggle" class="toggle-btn off">OFF</button>
+        <span class="toggle-hint">Auto-adjusts speed to your speech</span>
+      </div>
+    </div>
+
+    <button id="btn-start" class="start-btn">Start Presenting</button>
+  </div>
+
+  <!-- HUD display (presentation mode) -->
+  <div id="hud-panel" class="hidden">
+    <div id="hud-status">
+      <span id="hud-progress">0%</span>
+      <span id="hud-mode">PRESENTING</span>
+      <span id="hud-wpm">— WPM</span>
+    </div>
+
+    <div id="teleprompter-window">
+      <div id="focus-line"></div>
+      <div id="script-display"></div>
+    </div>
+
+    <div id="hud-controls">
+      <button id="btn-play-pause" class="hud-btn primary">⏸ Pause</button>
+      <button id="btn-slower" class="hud-btn secondary">− Slower</button>
+      <button id="btn-faster" class="hud-btn secondary">+ Faster</button>
+      <button id="btn-exit" class="hud-btn danger">Exit</button>
+    </div>
+
+    <div id="voice-indicator" class="hidden">
+      <span id="voice-dot"></span> Listening
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
