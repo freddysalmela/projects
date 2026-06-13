@@ -98,7 +98,9 @@ def main():
     print_banner()
     print_status("Tryck Enter för att tala. Ctrl+C för att avsluta.")
 
-    speak("Mycroft online. Redo att hjälpa.")
+    tts_key = cfg.elevenlabs_api_key
+
+    speak("Mycroft online. Redo att hjälpa.", tts_key)
 
     while True:
         try:
@@ -122,19 +124,19 @@ def main():
             print_user(text)
 
             if text.lower().strip() in ("hej då mycroft", "stäng av", "avsluta"):
-                speak("Stänger av. Ha det bra!")
+                speak("Stänger av. Ha det bra!", tts_key)
                 sys.exit(0)
 
             print_status("Tänker...")
             full_sentences = []
             for sentence in claude.chat_stream(text):
                 full_sentences.append(sentence)
-                print(sentence, end=" ", flush=True)  # show text as it streams in
+                print(sentence, end=" ", flush=True)
 
             full_response = " ".join(full_sentences)
-            print()  # newline after streamed text
+            print()
             print_mycroft(full_response)
-            speak(full_response)
+            speak(full_response, tts_key)
 
         except KeyboardInterrupt:
             print_status("Avslutar. Hej då!")

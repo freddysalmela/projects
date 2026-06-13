@@ -20,8 +20,9 @@ def _load_yaml() -> dict:
 
 @dataclass
 class Config:
-    anthropic_api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
-    openai_api_key: str    = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", ""))
+    anthropic_api_key: str  = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
+    openai_api_key: str     = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", ""))
+    elevenlabs_api_key: str = field(default_factory=lambda: os.environ.get("ELEVENLABS_API_KEY", ""))
     model: str = "claude-sonnet-4-6"
     max_history_turns: int = 20
     search_max_results: int = 5
