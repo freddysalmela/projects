@@ -341,7 +341,58 @@
     color: rgba(0,212,255,0.3); text-transform: uppercase;
   }
 
-  /* State-driven status color overrides */
+  /* ── HUD data panels ─────────────────────────────────────────── */
+  .hud-panel {
+    position: fixed;
+    top: 58px;
+    width: 210px;
+    background: rgba(0,212,255,0.03);
+    border: 1px solid var(--border);
+    padding: 10px 14px 12px;
+    z-index: 20;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .hud-panel-title {
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    opacity: 0.55;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+  #market-panel { left: 22px; }
+  #news-panel   { right: 22px; width: 240px; }
+
+  .market-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(0,212,255,0.05);
+    gap: 6px;
+  }
+  .market-sym   { color: rgba(0,212,255,0.6); min-width: 38px; letter-spacing: 1px; }
+  .market-price { color: #c8d8ee; flex: 1; text-align: right; }
+  .market-chg   { min-width: 52px; text-align: right; }
+  .market-chg.pos { color: #00ff88; }
+  .market-chg.neg { color: #ff4455; }
+
+  .news-item {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(0,212,255,0.05);
+    color: rgba(136,153,187,0.7);
+    font-size: 9px;
+    line-height: 1.4;
+    letter-spacing: 0.3px;
+  }
+  .news-item:last-child { border-bottom: none; }
+  .news-item::before { content: '›  '; color: var(--accent); opacity: 0.5; }
+
+  .panel-loading { color: rgba(0,212,255,0.2); font-size: 9px; letter-spacing: 2px; }
+
+
   body.recording #status { color: var(--rec-core); text-shadow: 0 0 10px rgba(255,34,51,0.5); }
   body.thinking  #status { color: var(--think-core); text-shadow: 0 0 10px rgba(255,170,0,0.5); }
   body.speaking  #status { color: var(--speak-core); text-shadow: 0 0 10px rgba(0,255,136,0.5); }
@@ -354,6 +405,18 @@
 <div class="corner corner-tr"></div>
 <div class="corner corner-bl"></div>
 <div class="corner corner-br"></div>
+
+<!-- Market panel (top-left) -->
+<div class="hud-panel" id="market-panel">
+  <div class="hud-panel-title">MARKETS</div>
+  <div id="market-rows"><div class="panel-loading">LADDAR...</div></div>
+</div>
+
+<!-- News panel (top-right) -->
+<div class="hud-panel" id="news-panel">
+  <div class="hud-panel-title">HEADLINES</div>
+  <div id="news-list"><div class="panel-loading">LADDAR...</div></div>
+</div>
 
 <!-- Top bar -->
 <div id="topbar">
@@ -718,6 +781,64 @@ function boot() {
   // Start animation loop
   if (animFrame) cancelAnimationFrame(animFrame);
   animFrame = requestAnimationFrame(animLoop);
+
+  // Load market + news data
+  loadMarkets();
+  loadNews();
+  setInterval(loadMarkets, 60000);
+  setInterval(loadNews, 300000);
+}
+
+// ── Markets ────────────────────────────────────────────────────────────────────
+const MARKET_LABELS = {
+  'BTC-USD': 'BTC',
+  'ETH-USD': 'ETH',
+  'SPY':     'S&P',
+  'GC=F':    'GOLD',
+};
+
+function fmtPrice(sym, price) {
+  if (sym === 'GC=F') return '$' + price.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) + '/oz';
+  if (sym === 'SPY')  return '$' + price.toFixed(2);
+  return '$' + price.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
+async function loadMarkets() {
+  try {
+    const res  = await fetch('/api/prices');
+    const data = await res.json();
+    const order = ['BTC-USD', 'ETH-USD', 'SPY', 'GC=F'];
+    const html = order.map(sym => {
+      const d = data[sym];
+      if (!d) return '';
+      const label = MARKET_LABELS[sym] || sym;
+      const chg   = d.change_pct;
+      const cls   = chg >= 0 ? 'pos' : 'neg';
+      const sign  = chg >= 0 ? '+' : '';
+      return `<div class="market-row">
+        <span class="market-sym">${label}</span>
+        <span class="market-price">${fmtPrice(sym, d.price)}</span>
+        <span class="market-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
+      </div>`;
+    }).join('');
+    document.getElementById('market-rows').innerHTML = html || '<div class="panel-loading">EJ TILLGÄNGLIG</div>';
+  } catch(e) {
+    document.getElementById('market-rows').innerHTML = '<div class="panel-loading">EJ TILLGÄNGLIG</div>';
+  }
+}
+
+// ── News ───────────────────────────────────────────────────────────────────────
+async function loadNews() {
+  try {
+    const res  = await fetch('/api/news');
+    const data = await res.json();
+    const html = (data.headlines || []).map(h =>
+      `<div class="news-item">${h}</div>`
+    ).join('');
+    document.getElementById('news-list').innerHTML = html || '<div class="panel-loading">EJ TILLGÄNGLIG</div>';
+  } catch(e) {
+    document.getElementById('news-list').innerHTML = '<div class="panel-loading">EJ TILLGÄNGLIG</div>';
+  }
 }
 </script>
 </body>
