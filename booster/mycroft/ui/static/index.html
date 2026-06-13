@@ -345,50 +345,52 @@
   .hud-panel {
     position: fixed;
     top: 58px;
-    width: 210px;
+    width: 270px;
     background: rgba(0,212,255,0.03);
     border: 1px solid var(--border);
-    padding: 10px 14px 12px;
+    padding: 12px 16px 14px;
     z-index: 20;
-    font-size: 10px;
-    line-height: 1.5;
   }
   .hud-panel-title {
     font-size: 8px;
     letter-spacing: 4px;
     color: var(--accent);
     opacity: 0.55;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     border-bottom: 1px solid var(--border);
-    padding-bottom: 6px;
+    padding-bottom: 7px;
   }
   #market-panel { left: 22px; }
-  #news-panel   { right: 22px; width: 240px; }
+  #news-panel   { right: 22px; }
 
+  /* Market rows */
+  .market-asset { margin-bottom: 10px; }
+  .market-asset:last-child { margin-bottom: 0; }
   .market-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 3px 0;
-    border-bottom: 1px solid rgba(0,212,255,0.05);
-    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 10px;
   }
-  .market-sym   { color: rgba(0,212,255,0.6); min-width: 38px; letter-spacing: 1px; }
-  .market-price { color: #c8d8ee; flex: 1; text-align: right; }
-  .market-chg   { min-width: 52px; text-align: right; }
+  .market-sym   { color: var(--accent); opacity: 0.8; min-width: 42px; letter-spacing: 1px; }
+  .market-price { color: #c8d8ee; flex: 1; text-align: right; font-size: 11px; }
+  .market-chg   { min-width: 52px; text-align: right; font-size: 10px; }
   .market-chg.pos { color: #00ff88; }
   .market-chg.neg { color: #ff4455; }
+  .spark-canvas { display: block; width: 100%; height: 32px; opacity: 0.8; }
 
+  /* News */
   .news-item {
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(0,212,255,0.05);
-    color: rgba(136,153,187,0.7);
-    font-size: 9px;
-    line-height: 1.4;
-    letter-spacing: 0.3px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(0,212,255,0.06);
+    color: rgba(136,153,187,0.75);
+    font-size: 9.5px;
+    line-height: 1.45;
+    letter-spacing: 0.2px;
   }
   .news-item:last-child { border-bottom: none; }
-  .news-item::before { content: '›  '; color: var(--accent); opacity: 0.5; }
+  .news-bullet { color: var(--accent); opacity: 0.5; margin-right: 4px; }
 
   .panel-loading { color: rgba(0,212,255,0.2); font-size: 9px; letter-spacing: 2px; }
 
@@ -789,18 +791,39 @@ function boot() {
   setInterval(loadNews, 300000);
 }
 
-// ── Markets ────────────────────────────────────────────────────────────────────
-const MARKET_LABELS = {
-  'BTC-USD': 'BTC',
-  'ETH-USD': 'ETH',
-  'SPY':     'S&P',
-  'GC=F':    'GOLD',
+// ── Markets + sparklines ───────────────────────────────────────────────────────
+const MARKET_META = {
+  'BTC-USD': { label: 'BTC',  fmt: p => '$' + Math.round(p).toLocaleString('en-US'), color: '#f7931a' },
+  'ETH-USD': { label: 'ETH',  fmt: p => '$' + Math.round(p).toLocaleString('en-US'), color: '#627eea' },
+  'SPY':     { label: 'S&P',  fmt: p => '$' + p.toFixed(2),                          color: '#00d4ff' },
+  'GC=F':    { label: 'GOLD', fmt: p => '$' + Math.round(p).toLocaleString('en-US') + '/oz', color: '#ffd700' },
 };
 
-function fmtPrice(sym, price) {
-  if (sym === 'GC=F') return '$' + price.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) + '/oz';
-  if (sym === 'SPY')  return '$' + price.toFixed(2);
-  return '$' + price.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+function drawSparkline(canvas, data, color, positive) {
+  if (!data || data.length < 2) return;
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * w,
+    y: h - 2 - ((v - min) / range) * (h - 4),
+  }));
+  // Fill
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, color + '55');
+  grad.addColorStop(1, color + '00');
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  // Line
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 }
 
 async function loadMarkets() {
@@ -809,19 +832,28 @@ async function loadMarkets() {
     const data = await res.json();
     const order = ['BTC-USD', 'ETH-USD', 'SPY', 'GC=F'];
     const html = order.map(sym => {
-      const d = data[sym];
-      if (!d) return '';
-      const label = MARKET_LABELS[sym] || sym;
-      const chg   = d.change_pct;
-      const cls   = chg >= 0 ? 'pos' : 'neg';
-      const sign  = chg >= 0 ? '+' : '';
-      return `<div class="market-row">
-        <span class="market-sym">${label}</span>
-        <span class="market-price">${fmtPrice(sym, d.price)}</span>
-        <span class="market-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
+      const d = data[sym]; if (!d) return '';
+      const m    = MARKET_META[sym];
+      const chg  = d.change_pct;
+      const cls  = chg >= 0 ? 'pos' : 'neg';
+      const sign = chg >= 0 ? '+' : '';
+      return `<div class="market-asset" data-sym="${sym}">
+        <div class="market-row">
+          <span class="market-sym">${m.label}</span>
+          <span class="market-price">${m.fmt(d.price)}</span>
+          <span class="market-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
+        </div>
+        <canvas class="spark-canvas" id="spark-${sym.replace('=','-')}" width="238" height="32"></canvas>
       </div>`;
     }).join('');
     document.getElementById('market-rows').innerHTML = html || '<div class="panel-loading">EJ TILLGÄNGLIG</div>';
+    // Draw sparklines after DOM update
+    order.forEach(sym => {
+      const d = data[sym]; if (!d || !d.sparkline) return;
+      const m = MARKET_META[sym];
+      const canvas = document.getElementById('spark-' + sym.replace('=','-'));
+      if (canvas) drawSparkline(canvas, d.sparkline, m.color, d.change_pct >= 0);
+    });
   } catch(e) {
     document.getElementById('market-rows').innerHTML = '<div class="panel-loading">EJ TILLGÄNGLIG</div>';
   }
@@ -833,7 +865,7 @@ async function loadNews() {
     const res  = await fetch('/api/news');
     const data = await res.json();
     const html = (data.headlines || []).map(h =>
-      `<div class="news-item">${h}</div>`
+      `<div class="news-item"><span class="news-bullet">›</span>${h}</div>`
     ).join('');
     document.getElementById('news-list').innerHTML = html || '<div class="panel-loading">EJ TILLGÄNGLIG</div>';
   } catch(e) {

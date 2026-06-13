@@ -13,36 +13,78 @@ _app = Flask(__name__, static_folder=_static)
 _sio = SocketIO(_app, cors_allowed_origins="*", async_mode="threading")
 _trigger_queue: queue.Queue = queue.Queue()
 
-# ── Price cache ────────────────────────────────────────────────────────────────
+# ── Price + sparkline cache ────────────────────────────────────────────────────
 _price_cache: dict = {}
 _price_ts: float = 0
-_PRICE_TTL = 60  # seconds
+_PRICE_TTL = 60
+
+
+def _fetch_crypto() -> dict:
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    r = requests.get(url, params={
+        "vs_currency": "usd",
+        "ids": "bitcoin,ethereum",
+        "sparkline": "true",
+        "price_change_percentage": "24h",
+    }, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    result = {}
+    for coin in r.json():
+        sym = "BTC-USD" if coin["id"] == "bitcoin" else "ETH-USD"
+        raw = coin.get("sparkline_in_7d", {}).get("price", [])
+        step = max(1, len(raw) // 40)
+        result[sym] = {
+            "price":      round(coin["current_price"], 2),
+            "change_pct": round(coin.get("price_change_percentage_24h") or 0, 2),
+            "sparkline":  raw[::step][-40:],
+        }
+    return result
+
+
+def _fetch_yahoo(symbol: str) -> dict:
+    r = requests.get(
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+        params={"interval": "1d", "range": "1mo"},
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=10,
+    )
+    res  = r.json()["chart"]["result"][0]
+    meta = res["meta"]
+    closes = [c for c in res["indicators"]["quote"][0]["close"] if c is not None]
+    price  = meta.get("regularMarketPrice", 0)
+    prev   = meta.get("previousClose") or meta.get("chartPreviousClose") or price
+    chg    = (price - prev) / prev * 100 if prev else 0
+    return {
+        "price":      round(price, 2),
+        "change_pct": round(chg, 2),
+        "sparkline":  closes[-40:],
+    }
+
 
 def _fetch_prices() -> dict:
     global _price_cache, _price_ts
     if time.time() - _price_ts < _PRICE_TTL and _price_cache:
         return _price_cache
+    data: dict = {}
     try:
-        symbols = "BTC-USD,ETH-USD,SPY,GC=F"
-        url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}"
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
-        items = r.json()["quoteResponse"]["result"]
-        _price_cache = {
-            item["symbol"]: {
-                "price": round(item.get("regularMarketPrice", 0), 2),
-                "change_pct": round(item.get("regularMarketChangePercent", 0), 2),
-            }
-            for item in items
-        }
-        _price_ts = time.time()
+        data.update(_fetch_crypto())
     except Exception:
         pass
+    for sym in ["SPY", "GC=F"]:
+        try:
+            data[sym] = _fetch_yahoo(sym)
+        except Exception:
+            pass
+    if data:
+        _price_cache = data
+        _price_ts = time.time()
     return _price_cache
+
 
 # ── News cache ─────────────────────────────────────────────────────────────────
 _news_cache: list = []
 _news_ts: float = 0
-_NEWS_TTL = 300  # 5 minutes
+_NEWS_TTL = 300
+
 
 def _fetch_news() -> list:
     global _news_cache, _news_ts
@@ -57,7 +99,7 @@ def _fetch_news() -> list:
         root = ET.fromstring(r.content)
         _news_cache = [
             item.findtext("title", "").strip()
-            for item in root.findall(".//item")[:7]
+            for item in root.findall(".//item")[:8]
             if item.findtext("title", "").strip()
         ]
         _news_ts = time.time()
@@ -87,17 +129,14 @@ def on_trigger():
 
 
 def set_state(state: str, **kwargs):
-    """Push a state update to all connected browsers."""
     _sio.emit("state", {"state": state, **kwargs})
 
 
 def wait_for_trigger():
-    """Block until the browser emits a 'trigger' event."""
     _trigger_queue.get()
 
 
 def start(port: int = 5050):
-    """Start the Flask-SocketIO server in a daemon thread."""
     t = threading.Thread(
         target=lambda: _sio.run(_app, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True),
         daemon=True,
