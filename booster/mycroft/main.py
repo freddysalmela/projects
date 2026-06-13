@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import os
+import time
 import webbrowser
 from datetime import date
 
@@ -108,66 +109,64 @@ def main():
 
     speak("Mycroft online. Redo att hjälpa.", tts_key)
 
-    busy = False
+    def run_once() -> bool:
+        """Run one listen→respond cycle. Returns True if should auto-listen again."""
+        ui.set_state("recording", status="LYSSNAR...")
+        wav = record()
+        if wav is None:
+            print_status("Hörde ingenting.")
+            return False
+
+        ui.set_state("thinking", status="TRANSKRIBERAR...")
+        text = transcribe(wav, cfg.openai_api_key)
+        if not text:
+            print_status("Hörde ingenting.")
+            return False
+
+        print_user(text)
+        ui.set_state("thinking", status="TÄNKER...", heard=text)
+
+        if text.lower().strip() in ("hej då mycroft", "stäng av", "avsluta"):
+            speak("Stänger av. Ha det bra!", tts_key)
+            sys.exit(0)
+
+        full_sentences = []
+        for sentence in claude.chat_stream(text):
+            full_sentences.append(sentence)
+            print(sentence, end=" ", flush=True)
+
+        full_response = " ".join(full_sentences)
+        print()
+
+        ui.set_state("speaking", status="TALAR", heard=text, text=full_response)
+        print_mycroft(full_response)
+        speak(full_response, tts_key)
+        return True
 
     while True:
         try:
-            ui.wait_for_trigger()  # blocks until user clicks orb or presses space
-        except KeyboardInterrupt:
-            print_status("Avslutar. Hej då!")
-            sys.exit(0)
-
-        if busy:
-            continue
-        busy = True
-
-        try:
-            ui.set_state("recording", status="LYSSNAR...")
-            wav = record()
-            if wav is None:
-                print_status("Hörde ingenting.")
-                ui.set_state("idle", status="REDO")
-                busy = False
-                continue
-
-            ui.set_state("thinking", status="TRANSKRIBERAR...")
-            text = transcribe(wav, cfg.openai_api_key)
-
-            if not text:
-                print_status("Hörde ingenting.")
-                ui.set_state("idle", status="REDO")
-                busy = False
-                continue
-
-            print_user(text)
-            ui.set_state("thinking", status="TÄNKER...", heard=text)
-
-            if text.lower().strip() in ("hej då mycroft", "stäng av", "avsluta"):
-                speak("Stänger av. Ha det bra!", tts_key)
-                sys.exit(0)
-
-            full_sentences = []
-            for sentence in claude.chat_stream(text):
-                full_sentences.append(sentence)
-                print(sentence, end=" ", flush=True)
-
-            full_response = " ".join(full_sentences)
-            print()
-
-            ui.set_state("speaking", status="TALAR", heard=text, text=full_response)
-            print_mycroft(full_response)
-            speak(full_response, tts_key)
-
             ui.set_state("idle", status="REDO")
-            busy = False
-
+            ui.wait_for_trigger()  # wait for orb click or spacebar
         except KeyboardInterrupt:
             print_status("Avslutar. Hej då!")
             sys.exit(0)
-        except Exception as e:
-            print_error(str(e))
-            ui.set_state("idle", status="FEL — FÖRSÖK IGEN")
-            busy = False
+
+        # Conversation loop — keeps listening until silence
+        while True:
+            try:
+                should_continue = run_once()
+            except KeyboardInterrupt:
+                print_status("Avslutar. Hej då!")
+                sys.exit(0)
+            except Exception as e:
+                print_error(str(e))
+                ui.set_state("idle", status="FEL — FÖRSÖK IGEN")
+                break
+
+            if should_continue:
+                time.sleep(0.7)  # brief gap so mic doesn't catch TTS tail
+            else:
+                break  # silence → back to idle, wait for next trigger
 
 
 if __name__ == "__main__":
