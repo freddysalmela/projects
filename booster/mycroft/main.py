@@ -107,7 +107,7 @@ def main():
     webbrowser.open("http://localhost:5050")
     ui.set_state("idle", status="REDO")
 
-    speak("Mycroft online. Redo att hjälpa.", tts_key)
+    speak("Gaia online. Redo att hjälpa.", tts_key)
 
     def run_once() -> bool:
         """Run one listen→respond cycle. Returns True if should auto-listen again."""
@@ -126,7 +126,7 @@ def main():
         print_user(text)
         ui.set_state("thinking", status="TÄNKER...", heard=text)
 
-        if text.lower().strip() in ("hej då mycroft", "stäng av", "avsluta"):
+        if text.lower().strip() in ("hej då gaia", "stäng av", "avsluta"):
             speak("Stänger av. Ha det bra!", tts_key)
             sys.exit(0)
 
