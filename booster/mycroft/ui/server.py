@@ -1,6 +1,7 @@
 import threading
 import queue
 import time
+import datetime
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -108,6 +109,80 @@ def _fetch_news() -> list:
     return _news_cache
 
 
+# ── Weather cache (Vaasa / Ostrobothnia) ──────────────────────────────────────
+_weather_cache: dict = {}
+_weather_ts: float = 0
+_WEATHER_TTL = 600  # 10 minutes
+
+_WMO_DESC = {
+    0:"Klart", 1:"Mestadels klart", 2:"Delvis molnigt", 3:"Mulet",
+    45:"Dimma", 48:"Rimfrost",
+    51:"Duggregn", 53:"Duggregn", 55:"Tätt duggregn",
+    61:"Lätt regn", 63:"Regn", 65:"Kraftigt regn",
+    71:"Lätt snöfall", 73:"Snöfall", 75:"Kraftigt snöfall", 77:"Snöhagel",
+    80:"Regnskurar", 81:"Regnskurar", 82:"Kraftiga skurar",
+    85:"Snöskurar", 86:"Kraftiga snöskurar",
+    95:"Åska", 96:"Åska med hagel", 99:"Kraftig åska",
+}
+_WMO_ICON = {
+    0:"☀", 1:"🌤", 2:"⛅", 3:"☁",
+    45:"🌫", 48:"🌫",
+    51:"🌦", 53:"🌦", 55:"🌦",
+    61:"🌧", 63:"🌧", 65:"🌧",
+    71:"❄", 73:"❄", 75:"❄", 77:"❄",
+    80:"🌦", 81:"🌦", 82:"🌦",
+    85:"❄", 86:"❄",
+    95:"⛈", 96:"⛈", 99:"⛈",
+}
+_DAYS_SV = ["Mån","Tis","Ons","Tor","Fre","Lör","Sön"]
+
+
+def _fetch_weather() -> dict:
+    global _weather_cache, _weather_ts
+    if time.time() - _weather_ts < _WEATHER_TTL and _weather_cache:
+        return _weather_cache
+    try:
+        r = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": 63.0951, "longitude": 21.6165,
+                "current": "temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m",
+                "daily": "temperature_2m_max,temperature_2m_min,weather_code",
+                "timezone": "Europe/Helsinki",
+                "forecast_days": 4,
+                "wind_speed_unit": "ms",
+            },
+            timeout=8,
+        )
+        d = r.json()
+        cur = d["current"]
+        day = d["daily"]
+        wc  = cur.get("weather_code", 0)
+        forecast = []
+        for i in range(4):
+            dt = datetime.date.fromisoformat(day["time"][i])
+            label = ["Idag", "Imorgon"][i] if i < 2 else _DAYS_SV[dt.weekday()]
+            forecast.append({
+                "day":  label,
+                "max":  round(day["temperature_2m_max"][i]),
+                "min":  round(day["temperature_2m_min"][i]),
+                "icon": _WMO_ICON.get(day["weather_code"][i], "?"),
+                "desc": _WMO_DESC.get(day["weather_code"][i], ""),
+            })
+        _weather_cache = {
+            "temp":     round(cur["temperature_2m"]),
+            "desc":     _WMO_DESC.get(wc, "Okänt"),
+            "icon":     _WMO_ICON.get(wc, "?"),
+            "wind":     round(cur.get("wind_speed_10m", 0)),
+            "humidity": round(cur.get("relative_humidity_2m", 0)),
+            "forecast": forecast,
+        }
+        _weather_ts = time.time()
+    except Exception:
+        pass
+    return _weather_cache
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 @_app.route("/")
 def index():
@@ -120,6 +195,10 @@ def api_prices():
 @_app.route("/api/news")
 def api_news():
     return jsonify({"headlines": _fetch_news()})
+
+@_app.route("/api/weather")
+def api_weather():
+    return jsonify(_fetch_weather())
 
 
 # ── SocketIO ───────────────────────────────────────────────────────────────────
