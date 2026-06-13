@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import os
+import webbrowser
 from datetime import date
 
 import pyaudio
@@ -12,6 +13,7 @@ from mycroft.audio.tts import speak
 from mycroft.config import load_config
 from mycroft.brain.claude_client import ClaudeClient
 from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_status, print_error
+from mycroft.ui import server as ui
 
 _RATE      = 16000
 _CHUNK     = 1024
@@ -96,38 +98,54 @@ def main():
     claude = ClaudeClient(cfg)
 
     print_banner()
-    print_status("Tryck Enter för att tala. Ctrl+C för att avsluta.")
 
     tts_key = cfg.elevenlabs_api_key
 
+    # Start the HUD server and open the browser
+    ui.start(port=5050)
+    webbrowser.open("http://localhost:5050")
+    ui.set_state("idle", status="REDO")
+
     speak("Mycroft online. Redo att hjälpa.", tts_key)
+
+    busy = False
 
     while True:
         try:
-            input()  # wait for Enter
+            ui.wait_for_trigger()  # blocks until user clicks orb or presses space
         except KeyboardInterrupt:
             print_status("Avslutar. Hej då!")
             sys.exit(0)
 
+        if busy:
+            continue
+        busy = True
+
         try:
+            ui.set_state("recording", status="LYSSNAR...")
             wav = record()
             if wav is None:
                 print_status("Hörde ingenting.")
+                ui.set_state("idle", status="REDO")
+                busy = False
                 continue
-            print_status("Transkriberar...")
+
+            ui.set_state("thinking", status="TRANSKRIBERAR...")
             text = transcribe(wav, cfg.openai_api_key)
 
             if not text:
                 print_status("Hörde ingenting.")
+                ui.set_state("idle", status="REDO")
+                busy = False
                 continue
 
             print_user(text)
+            ui.set_state("thinking", status="TÄNKER...", heard=text)
 
             if text.lower().strip() in ("hej då mycroft", "stäng av", "avsluta"):
                 speak("Stänger av. Ha det bra!", tts_key)
                 sys.exit(0)
 
-            print_status("Tänker...")
             full_sentences = []
             for sentence in claude.chat_stream(text):
                 full_sentences.append(sentence)
@@ -135,14 +153,21 @@ def main():
 
             full_response = " ".join(full_sentences)
             print()
+
+            ui.set_state("speaking", status="TALAR", heard=text, text=full_response)
             print_mycroft(full_response)
             speak(full_response, tts_key)
+
+            ui.set_state("idle", status="REDO")
+            busy = False
 
         except KeyboardInterrupt:
             print_status("Avslutar. Hej då!")
             sys.exit(0)
         except Exception as e:
             print_error(str(e))
+            ui.set_state("idle", status="FEL — FÖRSÖK IGEN")
+            busy = False
 
 
 if __name__ == "__main__":
