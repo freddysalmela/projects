@@ -4,8 +4,8 @@ import tempfile
 import pygame
 
 _mixer_ready = False
-_VOICE_ID = "pNInz6obpgDQGcFmaJgB"   # Adam — deep, clear, works great in Swedish
-_MODEL    = "eleven_multilingual_v2"   # full Swedish support
+_DEFAULT_VOICE_ID = "onwK4e9ZLuTAKqWW03F9"  # Daniel — deep British male, Jarvis-like
+_MODEL            = "eleven_multilingual_v2"  # full Swedish support
 
 
 def _init_mixer():
@@ -24,10 +24,11 @@ def speak(text: str, api_key: str = "") -> None:
     from elevenlabs.client import ElevenLabs
     _init_mixer()
 
+    voice_id = os.environ.get("ELEVENLABS_VOICE_ID", _DEFAULT_VOICE_ID)
     client = ElevenLabs(api_key=key)
     audio_bytes = b"".join(
         client.text_to_speech.convert(
-            voice_id=_VOICE_ID,
+            voice_id=voice_id,
             text=text,
             model_id=_MODEL,
             output_format="mp3_44100_128",
