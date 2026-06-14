@@ -238,6 +238,31 @@
   }
   #hint { font-size:8px; letter-spacing:4px; text-transform:uppercase; color:rgba(0,229,255,0.18); }
 
+  /* System gauges panel */
+  #sys-panel {
+    position: fixed; bottom: 46px; right: 20px;
+    width: 270px;
+    background: rgba(0,20,40,0.75);
+    border: 1px solid rgba(0,229,255,0.14);
+    padding: 12px 15px 14px;
+    backdrop-filter: blur(2px);
+    z-index: 20;
+  }
+  #sys-panel::before {
+    content:''; position:absolute; top:0; right:0;
+    width:18px; height:18px;
+    border-color: var(--c); border-style:solid; opacity:0.5;
+    border-width:2px 2px 0 0;
+  }
+  #gauge-canvas { display:block; width:100%; }
+  .sys-net {
+    display:flex; justify-content:space-between;
+    margin-top:8px; font-size:9px; letter-spacing:1px;
+    color:rgba(0,229,255,0.45);
+    border-top:1px solid rgba(0,229,255,0.08); padding-top:7px;
+  }
+  .sys-net span { color:#c8eeff; }
+
   /* ── Boot overlay ────────────────────────────────────────────── */
   #boot {
     position: fixed; inset: 0; background: #020c18;
@@ -292,6 +317,17 @@
 <div id="news-panel">
   <div class="hud-panel-title">HEADLINES</div>
   <div id="news-list"><div class="panel-loading">LADDAR...</div></div>
+</div>
+
+<!-- System gauges panel -->
+<div id="sys-panel">
+  <div class="hud-panel-title">SYSTEM</div>
+  <canvas id="gauge-canvas" width="240" height="72"></canvas>
+  <div class="sys-net">
+    <div>↑ <span id="net-up">0</span> KB/S</div>
+    <div>↓ <span id="net-down">0</span> KB/S</div>
+    <div>DISK <span id="disk-pct">0</span>%</div>
+  </div>
 </div>
 
 <div id="main">
@@ -356,6 +392,43 @@ const COLORS = {
 };
 
 let anim = null, aTime = 0;
+
+let waveformBuf = new Float32Array(64).fill(0);
+
+function updateWaveform(t) {
+  for (let i = 0; i < 64; i++) {
+    const angle = (i / 64) * Math.PI * 2;
+    let target;
+    if (orbState === 'recording') {
+      target = Math.random() * 11 + 1;
+    } else if (orbState === 'speaking') {
+      target = 4 + Math.sin(angle * 7 + t * 9) * 4 + Math.random() * 2.5;
+    } else if (orbState === 'thinking') {
+      target = 2 + Math.sin(angle * 3 + t * 1.8) * 2;
+    } else {
+      target = 0.8 + Math.sin(angle * 5 + t * 0.7) * 0.6;
+    }
+    const smooth = orbState === 'recording' ? 0.5 : 0.88;
+    waveformBuf[i] = waveformBuf[i] * smooth + target * (1 - smooth);
+  }
+}
+
+function drawWaveformRing(t) {
+  updateWaveform(t);
+  const col = COLORS[orbState] || COLORS.idle;
+  const glow = col[3];
+  for (let i = 0; i < 64; i++) {
+    const angle = (i / 64) * Math.PI * 2 - Math.PI / 2;
+    const amp = waveformBuf[i];
+    const x1 = CX + Math.cos(angle) * 106;
+    const y1 = CY + Math.sin(angle) * 106;
+    const x2 = CX + Math.cos(angle) * (106 + amp);
+    const y2 = CY + Math.sin(angle) * (106 + amp);
+    oc.beginPath(); oc.moveTo(x1, y1); oc.lineTo(x2, y2);
+    oc.strokeStyle = hex4(glow, Math.min(0.9, 0.4 + amp / 14));
+    oc.lineWidth = 1.5; oc.stroke();
+  }
+}
 
 function drawReactor(t) {
   const [core, mid, edge, glow] = COLORS[orbState] || COLORS.idle;
@@ -442,6 +515,8 @@ function drawReactor(t) {
   cg.addColorStop(0.35, hex4(glow,0.9));
   cg.addColorStop(1, hex4(glow,0));
   oc.beginPath(); oc.arc(CX,CY,18,0,Math.PI*2); oc.fillStyle=cg; oc.fill();
+
+  drawWaveformRing(t);
 }
 
 function animLoop(ts) {
@@ -511,13 +586,34 @@ const respEl   = document.getElementById('resp');
 const cursorEl = document.getElementById('cursor');
 let twTimer=null, twQ='', twI=0;
 
-function typewriterStart(text) {
+const _GLYPHS = '01アイウエオカキクケコ#$%@&*<>?/\\|ABCDEF0123456789';
+
+function decryptStart(text) {
   if (twTimer) clearInterval(twTimer);
-  twQ=text; twI=0; respEl.textContent=''; cursorEl.classList.add('active');
-  twTimer=setInterval(()=>{
-    if (twI<twQ.length) { respEl.textContent+=twQ[twI++]; }
-    else { clearInterval(twTimer); twTimer=null; cursorEl.classList.remove('active'); }
-  }, 16);
+  respEl.textContent = ''; cursorEl.classList.add('active');
+  const dur = Math.max(600, Math.min(1800, text.length * 22));
+  const start = Date.now();
+
+  twTimer = setInterval(() => {
+    const progress = Math.min((Date.now() - start) / dur, 1);
+    let out = '';
+    for (let i = 0; i < text.length; i++) {
+      const cp = (progress - (i / text.length) * 0.45) / 0.55;
+      if (text[i] === ' ' || text[i] === '\n' || cp >= 1) {
+        out += text[i];
+      } else if (cp > 0) {
+        out += _GLYPHS[Math.floor(Math.random() * _GLYPHS.length)];
+      } else {
+        out += '·';
+      }
+    }
+    respEl.textContent = out;
+    if (progress >= 1) {
+      respEl.textContent = text;
+      clearInterval(twTimer); twTimer = null;
+      cursorEl.classList.remove('active');
+    }
+  }, 40);
 }
 
 // ── State machine ──────────────────────────────────────────────────────────────
@@ -527,7 +623,7 @@ function applyState(data) {
   document.body.className = state;
   statusEl.textContent = data.status || {idle:'REDO',recording:'LYSSNAR...',thinking:'TÄNKER...',speaking:'TALAR'}[state]||state.toUpperCase();
   if (data.heard!=null) heardEl.textContent = data.heard ? `"${data.heard}"` : '';
-  if (data.text!=null)  typewriterStart(data.text);
+  if (data.text!=null)  decryptStart(data.text);
   if (state==='idle') {
     busy=false;
     if (data.text==null && data.heard==null) {
@@ -635,6 +731,55 @@ async function loadWeather() {
   } catch(e) { document.getElementById('weather-content').innerHTML='<div class="panel-loading">EJ TILLGÄNGLIG</div>'; }
 }
 
+// ── System gauges ──────────────────────────────────────────────────────────────
+const gaugeCanvas = document.getElementById('gauge-canvas');
+
+function drawArcGauge(ctx, cx, cy, r, value, color, label, unit) {
+  const startA = Math.PI * 0.75, sweep = Math.PI * 1.5;
+  // Track
+  ctx.beginPath(); ctx.arc(cx, cy, r, startA, startA + sweep);
+  ctx.strokeStyle = 'rgba(0,229,255,0.08)'; ctx.lineWidth = 7; ctx.stroke();
+  // Fill
+  const endA = startA + (value / 100) * sweep;
+  ctx.beginPath(); ctx.arc(cx, cy, r, startA, endA);
+  ctx.strokeStyle = color; ctx.lineWidth = 7;
+  ctx.shadowColor = color; ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Value text
+  ctx.fillStyle = '#c8eeff'; ctx.textAlign = 'center';
+  ctx.font = 'bold 13px Courier New';
+  ctx.fillText(Math.round(value) + unit, cx, cy + 5);
+  // Label
+  ctx.fillStyle = 'rgba(0,229,255,0.4)';
+  ctx.font = '7px Courier New';
+  ctx.letterSpacing = '2px';
+  ctx.fillText(label, cx, cy + 20);
+}
+
+function renderGauges(cpu, ram) {
+  if (!gaugeCanvas) return;
+  const ctx = gaugeCanvas.getContext('2d');
+  ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
+  const cpuColor  = cpu  > 80 ? '#ff4455' : cpu  > 60 ? '#ffaa00' : '#00e5ff';
+  const ramColor  = ram  > 80 ? '#ff4455' : ram  > 60 ? '#ffaa00' : '#00cc88';
+  drawArcGauge(ctx,  50, 44, 32, cpu, cpuColor,  'CPU',  '%');
+  drawArcGauge(ctx, 140, 44, 32, ram, ramColor,  'RAM',  '%');
+}
+
+async function loadSystem() {
+  try {
+    const d = await (await fetch('/api/system')).json();
+    renderGauges(d.cpu ?? 0, d.ram ?? 0);
+    const nu = document.getElementById('net-up');
+    const nd = document.getElementById('net-down');
+    const dp = document.getElementById('disk-pct');
+    if (nu) nu.textContent = d.net_up  ?? 0;
+    if (nd) nd.textContent = d.net_down ?? 0;
+    if (dp) dp.textContent = d.disk    ?? 0;
+  } catch(e) {}
+}
+
 // ── Color utils ────────────────────────────────────────────────────────────────
 function hex4(hex, a) {
   const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
@@ -669,6 +814,8 @@ function boot() {
   setInterval(loadMarkets,  60000);
   setInterval(loadNews,    300000);
   setInterval(loadWeather, 600000);
+  loadSystem();
+  setInterval(loadSystem, 3000);
 }
 </script>
 </body>

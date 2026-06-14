@@ -5,6 +5,8 @@ import datetime
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import psutil
+
 import requests
 from flask import Flask, send_from_directory, jsonify
 from flask_socketio import SocketIO
@@ -183,6 +185,34 @@ def _fetch_weather() -> dict:
     return _weather_cache
 
 
+# ── System stats ──────────────────────────────────────────────────────────────
+_prev_net = None
+_prev_net_ts: float = 0
+
+
+def _fetch_system() -> dict:
+    global _prev_net, _prev_net_ts
+    cpu  = psutil.cpu_percent(interval=None)
+    ram  = psutil.virtual_memory().percent
+    disk = psutil.disk_usage('/').percent if True else 0
+    net  = psutil.net_io_counters()
+    now  = time.time()
+    net_up = net_down = 0.0
+    if _prev_net and now - _prev_net_ts > 0:
+        dt = now - _prev_net_ts
+        net_up   = (net.bytes_sent - _prev_net.bytes_sent) / dt / 1024
+        net_down = (net.bytes_recv - _prev_net.bytes_recv) / dt / 1024
+    _prev_net   = net
+    _prev_net_ts = now
+    return {
+        "cpu":      round(cpu),
+        "ram":      round(ram),
+        "disk":     round(disk),
+        "net_up":   round(net_up),
+        "net_down": round(net_down),
+    }
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 @_app.route("/")
 def index():
@@ -199,6 +229,10 @@ def api_news():
 @_app.route("/api/weather")
 def api_weather():
     return jsonify(_fetch_weather())
+
+@_app.route("/api/system")
+def api_system():
+    return jsonify(_fetch_system())
 
 
 # ── SocketIO ───────────────────────────────────────────────────────────────────
