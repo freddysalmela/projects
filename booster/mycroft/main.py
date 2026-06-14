@@ -109,17 +109,21 @@ def main():
 
     speak("Gaia online. Redo att hjälpa.", tts_key)
 
+    from mycroft import state
+
     def run_once() -> bool:
         """Run one listen→respond cycle. Returns True if should auto-listen again."""
+        state.stop_event.clear()
+
         ui.set_state("recording", status="LYSSNAR...")
         wav = record()
-        if wav is None:
+        if wav is None or state.stop_event.is_set():
             print_status("Hörde ingenting.")
             return False
 
         ui.set_state("thinking", status="TRANSKRIBERAR...")
         text = transcribe(wav, cfg.openai_api_key)
-        if not text:
+        if not text or state.stop_event.is_set():
             print_status("Hörde ingenting.")
             return False
 
@@ -132,8 +136,14 @@ def main():
 
         full_sentences = []
         for sentence in claude.chat_stream(text):
+            if state.stop_event.is_set():
+                break
             full_sentences.append(sentence)
             print(sentence, end=" ", flush=True)
+
+        if state.stop_event.is_set():
+            print()
+            return False
 
         full_response = " ".join(full_sentences)
         print()
@@ -141,17 +151,19 @@ def main():
         ui.set_state("speaking", status="TALAR", heard=text, text=full_response)
         print_mycroft(full_response)
         speak(full_response, tts_key)
+
+        if state.stop_event.is_set():
+            return False
         return True
 
     while True:
         try:
             ui.set_state("idle", status="REDO")
-            ui.wait_for_trigger()  # wait for orb click or spacebar
+            ui.wait_for_trigger()
         except KeyboardInterrupt:
             print_status("Avslutar. Hej då!")
             sys.exit(0)
 
-        # Conversation loop — keeps listening until silence
         while True:
             try:
                 should_continue = run_once()
@@ -163,10 +175,13 @@ def main():
                 ui.set_state("idle", status="FEL — FÖRSÖK IGEN")
                 break
 
+            if state.stop_event.is_set():
+                ui.set_state("idle", status="AVBRUTEN")
+                break
             if should_continue:
-                time.sleep(0.7)  # brief gap so mic doesn't catch TTS tail
+                time.sleep(0.7)
             else:
-                break  # silence → back to idle, wait for next trigger
+                break
 
 
 if __name__ == "__main__":

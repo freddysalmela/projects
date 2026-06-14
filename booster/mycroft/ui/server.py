@@ -207,6 +207,12 @@ def on_trigger():
     _trigger_queue.put(True)
 
 
+@_sio.on("stop")
+def on_stop():
+    from mycroft import state
+    state.stop_event.set()
+
+
 def set_state(state: str, **kwargs):
     _sio.emit("state", {"state": state, **kwargs})
 

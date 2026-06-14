@@ -3,9 +3,11 @@ import tempfile
 
 import pygame
 
+from mycroft import state
+
 _mixer_ready = False
-_DEFAULT_VOICE_ID = "onwK4e9ZLuTAKqWW03F9"  # Daniel — deep British male, Jarvis-like
-_MODEL            = "eleven_multilingual_v2"  # full Swedish support
+_DEFAULT_VOICE_ID = "onwK4e9ZLuTAKqWW03F9"
+_MODEL            = "eleven_multilingual_v2"
 
 
 def _init_mixer():
@@ -13,6 +15,17 @@ def _init_mixer():
     if not _mixer_ready:
         pygame.mixer.init()
         _mixer_ready = True
+
+
+def _play_and_wait(tmp: str) -> None:
+    """Load and play a file, stopping immediately if stop_event is set."""
+    pygame.mixer.music.load(tmp)
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        if state.stop_event.is_set():
+            pygame.mixer.music.stop()
+            return
+        pygame.time.wait(50)
 
 
 def speak(text: str, api_key: str = "") -> None:
@@ -39,10 +52,7 @@ def speak(text: str, api_key: str = "") -> None:
     try:
         with open(tmp, "wb") as f:
             f.write(audio_bytes)
-        pygame.mixer.music.load(tmp)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.wait(50)
+        _play_and_wait(tmp)
     finally:
         try:
             os.remove(tmp)
@@ -51,7 +61,6 @@ def speak(text: str, api_key: str = "") -> None:
 
 
 def _speak_edge(text: str) -> None:
-    """Fallback TTS when no ElevenLabs key is set."""
     import asyncio
     import edge_tts
     _init_mixer()
@@ -60,10 +69,7 @@ def _speak_edge(text: str) -> None:
         tmp = tempfile.mktemp(suffix=".mp3")
         try:
             await edge_tts.Communicate(text, "sv-SE-SofieNeural").save(tmp)
-            pygame.mixer.music.load(tmp)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy():
-                pygame.time.wait(50)
+            _play_and_wait(tmp)
         finally:
             try:
                 os.remove(tmp)

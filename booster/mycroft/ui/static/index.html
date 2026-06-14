@@ -317,7 +317,7 @@
 </div>
 
 <div id="bottombar">
-  <div id="hint">KLICKA PÅ ORB ELLER TRYCK MELLANSLAG FÖR ATT TALA</div>
+  <div id="hint">MELLANSLAG — TALA  ·  ESC — AVBRYT</div>
 </div>
 
 <div id="boot" onclick="boot()">
@@ -544,6 +544,16 @@ function handleTrigger() {
   busy=true; socket.emit('trigger');
 }
 
+function handleStop() {
+  if (!socket||!socket.connected) return;
+  socket.emit('stop');
+  busy = false;
+  orbState = 'idle';
+  document.body.className = 'idle';
+  statusEl.textContent = 'AVBRUTEN';
+  setTimeout(() => { if (statusEl.textContent === 'AVBRUTEN') statusEl.textContent = 'REDO'; }, 2000);
+}
+
 // ── Markets ────────────────────────────────────────────────────────────────────
 const MMETA = {
   'BTC-USD':{label:'BTC', fmt:p=>'$'+Math.round(p).toLocaleString('en-US'), color:'#f7931a'},
@@ -648,6 +658,7 @@ function boot() {
 
   document.addEventListener('keydown', e=>{
     if(e.code==='Space'&&!e.repeat){ e.preventDefault(); handleTrigger(); }
+    if(e.code==='Escape'){ e.preventDefault(); handleStop(); }
   });
 
   if(anim) cancelAnimationFrame(anim);
