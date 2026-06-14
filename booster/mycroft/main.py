@@ -21,8 +21,8 @@ _CHUNK     = 1024
 _CHANNELS  = 1
 _FORMAT    = pyaudio.paInt16
 _SILENCE_THRESHOLD = 400
-_SILENCE_SECS      = 1.5
-_MAX_SECS          = 12
+_SILENCE_SECS      = 2.8
+_MAX_SECS          = 30
 
 
 def record() -> str | None:
