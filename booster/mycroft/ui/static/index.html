@@ -636,8 +636,11 @@ function applyState(data) {
 
 // ── Trigger ────────────────────────────────────────────────────────────────────
 function handleTrigger() {
-  if (busy||!socket||!socket.connected) return;
-  busy=true; socket.emit('trigger');
+  if (busy) return;
+  if (!socket||!socket.connected) { statusEl.textContent='EJ ANSLUTEN'; return; }
+  busy=true;
+  statusEl.textContent='AKTIVERAR...';
+  socket.emit('trigger');
 }
 
 function handleStop() {
@@ -791,7 +794,11 @@ function lighten(hex, amt) {
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
+let booted = false;
+
 function boot() {
+  if (booted) return;
+  booted = true;
   document.getElementById('boot').style.display='none';
   resizeLines();
   window.addEventListener('resize', resizeLines);
@@ -800,11 +807,6 @@ function boot() {
   socket.on('connect',    ()=>applyState({state:'idle',status:'ANSLUTEN'}));
   socket.on('disconnect', ()=>{ busy=false; statusEl.textContent='ÅTERANSLUTER...'; });
   socket.on('state',      data=>{ applyState(data); if(data.state&&data.state!=='idle') busy=true; });
-
-  document.addEventListener('keydown', e=>{
-    if(e.code==='Space'&&!e.repeat){ e.preventDefault(); handleTrigger(); }
-    if(e.code==='Escape'){ e.preventDefault(); handleStop(); }
-  });
 
   if(anim) cancelAnimationFrame(anim);
   requestAnimationFrame(animLoop);
@@ -817,6 +819,16 @@ function boot() {
   loadSystem();
   setInterval(loadSystem, 3000);
 }
+
+// Global keydown — works before and after boot
+document.addEventListener('keydown', e=>{
+  if (e.code==='Space' && !e.repeat) {
+    e.preventDefault();
+    if (!booted) { boot(); return; }
+    handleTrigger();
+  }
+  if (e.code==='Escape') { e.preventDefault(); handleStop(); }
+});
 </script>
 </body>
 </html>
