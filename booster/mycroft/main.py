@@ -2,6 +2,8 @@ import sys
 import tempfile
 import os
 import time
+import queue
+import threading
 import webbrowser
 from datetime import date
 
@@ -134,23 +136,53 @@ def main():
             speak("Stänger av. Ha det bra!", tts_key)
             sys.exit(0)
 
-        full_sentences = []
+        # ── Pipeline: stream sentences → TTS queue → worker thread ─────────
+        tts_q: queue.Queue = queue.Queue()
+
+        def _tts_worker():
+            while True:
+                chunk = tts_q.get()
+                if chunk is None:
+                    break
+                if not state.stop_event.is_set():
+                    speak(chunk, tts_key)
+
+        tts_thread = threading.Thread(target=_tts_worker, daemon=True)
+        tts_thread.start()
+
+        full_sentences: list[str] = []
+        pending: list[str] = []
+        first_chunk_sent = False
+
         for sentence in claude.chat_stream(text):
             if state.stop_event.is_set():
                 break
             full_sentences.append(sentence)
             print(sentence, end=" ", flush=True)
+            pending.append(sentence)
 
-        if state.stop_event.is_set():
-            print()
-            return False
+            # First chunk: wait for 2 sentences to avoid a single choppy word;
+            # after that flush every sentence so audio overlaps generation.
+            threshold = 2 if not first_chunk_sent else 1
+            if len(pending) >= threshold:
+                tts_q.put(" ".join(pending))
+                pending.clear()
+                if not first_chunk_sent:
+                    first_chunk_sent = True
+                    ui.set_state("speaking", status="TALAR", heard=text)
+
+        # Flush any remaining sentences
+        if pending and not state.stop_event.is_set():
+            tts_q.put(" ".join(pending))
+
+        tts_q.put(None)   # signal worker to exit
+        tts_thread.join() # wait for all audio to finish
 
         full_response = " ".join(full_sentences)
         print()
 
         ui.set_state("speaking", status="TALAR", heard=text, text=full_response)
         print_mycroft(full_response)
-        speak(full_response, tts_key)
 
         if state.stop_event.is_set():
             return False
