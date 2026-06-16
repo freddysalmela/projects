@@ -430,91 +430,150 @@ function drawWaveformRing(t) {
   }
 }
 
+// Pre-baked circuit traces on sphere surface (static seeded layout)
+const _CIRCUIT = (() => {
+  const segs = [], nodes = [];
+  const rng = s => { let x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  for (let i = 0; i < 28; i++) {
+    const a  = rng(i * 4)     * Math.PI * 2;
+    const r  = rng(i * 4 + 1) * 58 + 12;
+    const x  = Math.cos(a) * r, y = Math.sin(a) * r;
+    nodes.push([x, y]);
+    const da = (rng(i * 4 + 2) - 0.5) * 1.5;
+    const r2 = Math.min(78, r + rng(i * 4 + 3) * 26 + 6);
+    segs.push([x, y, Math.cos(a + da) * r2, Math.sin(a + da) * r2]);
+  }
+  return { segs, nodes };
+})();
+
 function drawReactor(t) {
   const [core, mid, edge, glow] = COLORS[orbState] || COLORS.idle;
   oc.clearRect(0, 0, orbCanvas.width, orbCanvas.height);
 
-  const pulse = 1 + Math.sin(t * 1.2) * 0.04;
+  const R  = 86;   // sphere radius
+  const Ro = 100;  // orbital ring radius
 
-  // ── outer atmospheric glow ──
-  const ag = oc.createRadialGradient(CX,CY,80,CX,CY,118*pulse);
-  ag.addColorStop(0, hex4(glow,0.18)); ag.addColorStop(1, hex4(glow,0));
-  oc.beginPath(); oc.arc(CX,CY,118*pulse,0,Math.PI*2); oc.fillStyle=ag; oc.fill();
+  // ── Outer atmospheric haze ──────────────────────────────────────────
+  const ag = oc.createRadialGradient(CX, CY, R * 0.35, CX, CY, R * 1.55);
+  ag.addColorStop(0,   hex4(glow, 0.20));
+  ag.addColorStop(0.55, hex4(glow, 0.06));
+  ag.addColorStop(1,   hex4(glow, 0));
+  oc.beginPath(); oc.arc(CX, CY, R * 1.55, 0, Math.PI * 2);
+  oc.fillStyle = ag; oc.fill();
 
-  // ── outermost spinning dashed ring ──
-  oc.save(); oc.translate(CX,CY); oc.rotate(t*0.18);
-  oc.setLineDash([8,6]);
-  oc.beginPath(); oc.arc(0,0,100,0,Math.PI*2);
-  oc.strokeStyle=hex4(glow,0.25); oc.lineWidth=1; oc.stroke();
-  oc.setLineDash([]); oc.restore();
+  // ── Sphere edge silhouette ──────────────────────────────────────────
+  const rim = oc.createRadialGradient(CX, CY, R * 0.72, CX, CY, R);
+  rim.addColorStop(0, hex4(core, 0));
+  rim.addColorStop(1, hex4(core, 0.12));
+  oc.beginPath(); oc.arc(CX, CY, R, 0, Math.PI * 2);
+  oc.fillStyle = rim; oc.fill();
+  oc.strokeStyle = hex4(glow, 0.30); oc.lineWidth = 1; oc.stroke();
 
-  // ── outer ring ──
-  oc.beginPath(); oc.arc(CX,CY,88,0,Math.PI*2);
-  oc.strokeStyle=hex4(glow,0.35); oc.lineWidth=1.5; oc.stroke();
-
-  // ── triangle segments (arc reactor style) ──
-  const segs = 8;
-  for (let i=0; i<segs; i++) {
-    const a = (i/segs)*Math.PI*2 + t*0.08;
-    oc.save(); oc.translate(CX,CY); oc.rotate(a);
+  // ── Globe wireframe — latitude lines ───────────────────────────────
+  [-60, -30, 0, 30, 60].forEach(deg => {
+    const phi = deg * Math.PI / 180;
+    const rx  = R * Math.cos(phi);
+    const cy  = CY + R * Math.sin(phi) * 0.42;
+    if (rx < 3) return;
     oc.beginPath();
-    oc.moveTo(62,-7); oc.lineTo(80,0); oc.lineTo(62,7); oc.closePath();
-    oc.fillStyle = hex4(core, 0.65);
-    oc.fill();
-    oc.restore();
+    oc.ellipse(CX, cy, rx, rx * 0.28, 0, 0, Math.PI * 2);
+    oc.strokeStyle = hex4(glow, deg === 0 ? 0.22 : 0.10);
+    oc.lineWidth   = deg === 0 ? 0.9 : 0.5;
+    oc.stroke();
+  });
+
+  // Globe wireframe — longitude lines (slow drift)
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI + t * 0.028;
+    oc.save(); oc.translate(CX, CY); oc.rotate(a);
+    oc.beginPath(); oc.ellipse(0, 0, R, R * 0.28, 0, 0, Math.PI * 2);
+    oc.strokeStyle = hex4(glow, 0.09); oc.lineWidth = 0.5;
+    oc.stroke(); oc.restore();
   }
 
-  // ── middle ring ──
-  oc.beginPath(); oc.arc(CX,CY,60,0,Math.PI*2);
-  oc.strokeStyle=hex4(core,0.7); oc.lineWidth=2; oc.stroke();
+  // ── Circuit traces (slowly rotating on sphere surface) ─────────────
+  oc.save(); oc.translate(CX, CY); oc.rotate(t * 0.038);
+  oc.beginPath();
+  _CIRCUIT.segs.forEach(([x1, y1, x2, y2]) => { oc.moveTo(x1, y1); oc.lineTo(x2, y2); });
+  oc.strokeStyle = hex4(glow, 0.22); oc.lineWidth = 0.7; oc.stroke();
+  _CIRCUIT.nodes.forEach(([nx, ny]) => {
+    oc.beginPath(); oc.arc(nx, ny, 1.4, 0, Math.PI * 2);
+    oc.fillStyle = hex4(glow, 0.55); oc.fill();
+  });
+  oc.restore();
 
-  // ── inner ring (counter-rotate) ──
-  oc.save(); oc.translate(CX,CY); oc.rotate(-t*0.35);
-  oc.setLineDash([5,5]);
-  oc.beginPath(); oc.arc(0,0,46,0,Math.PI*2);
-  oc.strokeStyle=hex4(glow,0.6); oc.lineWidth=1.5; oc.stroke();
-  oc.setLineDash([]); oc.restore();
+  // ── Orbital rings — gyroscope / armillary sphere ────────────────────
+  // Each ring: inclination in degrees, azimuth speed, alpha, lineWidth
+  const orbitals = [
+    { inc: 12,  spd:  0.22, phase: 0,              lw: 1.6, al: 0.80 },
+    { inc: 78,  spd: -0.15, phase: Math.PI / 3,    lw: 1.5, al: 0.65 },
+    { inc: -52, spd:  0.27, phase: Math.PI,         lw: 1.3, al: 0.55 },
+    { inc: 38,  spd: -0.19, phase: Math.PI * 0.7,  lw: 1.1, al: 0.42 },
+    { inc: -25, spd:  0.33, phase: Math.PI * 1.4,  lw: 0.9, al: 0.32 },
+  ];
 
-  // ── state-specific wave rings ──
-  if (orbState==='recording' || orbState==='speaking') {
-    const count = orbState==='recording' ? 3 : 4;
-    const speed = orbState==='recording' ? 1.6 : 2.0;
-    for (let i=0;i<count;i++) {
-      const ph = (t*speed + i*0.5) % (Math.PI*2);
-      const pr = ph/(Math.PI*2);
-      const wr = 60 + pr*58;
-      oc.beginPath(); oc.arc(CX,CY,wr,0,Math.PI*2);
-      oc.strokeStyle=hex4(glow,(1-pr)*0.5);
-      oc.lineWidth=(1-pr)*2.5+0.3; oc.stroke();
+  orbitals.forEach(({ inc, spd, phase, lw, al }, ri) => {
+    const iRad = inc * Math.PI / 180;
+    const az   = t * spd + phase;
+    const ry   = Ro * Math.abs(Math.cos(iRad));
+
+    oc.save(); oc.translate(CX, CY); oc.rotate(az);
+
+    // Ring itself
+    oc.beginPath(); oc.ellipse(0, 0, Ro, ry, 0, 0, Math.PI * 2);
+    oc.strokeStyle = hex4(glow, al);
+    oc.lineWidth   = lw;
+    oc.shadowColor = glow; oc.shadowBlur = 7;
+    oc.stroke();    oc.shadowBlur = 0;
+
+    // Traveling bright dot
+    const dt = t * (0.9 + ri * 0.28);
+    oc.beginPath(); oc.arc(Ro * Math.cos(dt), ry * Math.sin(dt), 2.2, 0, Math.PI * 2);
+    oc.fillStyle   = '#fff';
+    oc.shadowColor = glow; oc.shadowBlur = 12;
+    oc.fill();      oc.shadowBlur = 0;
+
+    oc.restore();
+  });
+
+  // State pulse rings (expand outward when active)
+  if (orbState === 'recording' || orbState === 'speaking') {
+    const count = orbState === 'recording' ? 2 : 3;
+    const spd   = orbState === 'recording' ? 1.4 : 1.8;
+    for (let i = 0; i < count; i++) {
+      const pr = ((t * spd + i * 0.6) % (Math.PI * 2)) / (Math.PI * 2);
+      const wr = 42 + pr * 54;
+      oc.beginPath(); oc.arc(CX, CY, wr, 0, Math.PI * 2);
+      oc.strokeStyle = hex4(glow, (1 - pr) * 0.45);
+      oc.lineWidth   = (1 - pr) * 2 + 0.3; oc.stroke();
     }
   }
-  if (orbState==='thinking') {
-    oc.save(); oc.translate(CX,CY); oc.rotate(t*2.5);
-    oc.setLineDash([10,8]);
-    oc.beginPath(); oc.arc(0,0,72,0,Math.PI*2);
-    oc.strokeStyle=hex4(glow,0.6); oc.lineWidth=2; oc.stroke();
+  if (orbState === 'thinking') {
+    oc.save(); oc.translate(CX, CY); oc.rotate(t * 2.2);
+    oc.setLineDash([9, 7]);
+    oc.beginPath(); oc.arc(0, 0, 68, 0, Math.PI * 2);
+    oc.strokeStyle = hex4(glow, 0.55); oc.lineWidth = 1.8; oc.stroke();
     oc.setLineDash([]); oc.restore();
   }
 
-  // ── inner sphere gradient ──
-  const sg = oc.createRadialGradient(CX-14,CY-16,2,CX,CY,40);
-  sg.addColorStop(0, lighten(core,0.5));
-  sg.addColorStop(0.5, core);
+  // ── Inner core sphere ───────────────────────────────────────────────
+  const sg = oc.createRadialGradient(CX - 14, CY - 16, 2, CX, CY, 40);
+  sg.addColorStop(0,    lighten(core, 0.52));
+  sg.addColorStop(0.45, core);
   sg.addColorStop(0.85, mid);
-  sg.addColorStop(1, edge);
-  oc.beginPath(); oc.arc(CX,CY,40,0,Math.PI*2); oc.fillStyle=sg; oc.fill();
+  sg.addColorStop(1,    edge);
+  oc.beginPath(); oc.arc(CX, CY, 40, 0, Math.PI * 2); oc.fillStyle = sg; oc.fill();
 
-  // ── inner glow fill ──
-  const ig = oc.createRadialGradient(CX,CY,0,CX,CY,38);
-  ig.addColorStop(0,hex4(glow,0.5)); ig.addColorStop(1,hex4(glow,0));
-  oc.beginPath(); oc.arc(CX,CY,38,0,Math.PI*2); oc.fillStyle=ig; oc.fill();
+  const ig = oc.createRadialGradient(CX, CY, 0, CX, CY, 38);
+  ig.addColorStop(0, hex4(glow, 0.52)); ig.addColorStop(1, hex4(glow, 0));
+  oc.beginPath(); oc.arc(CX, CY, 38, 0, Math.PI * 2); oc.fillStyle = ig; oc.fill();
 
-  // ── center bright spot ──
-  const cg = oc.createRadialGradient(CX,CY,0,CX,CY,18);
-  cg.addColorStop(0,'rgba(255,255,255,0.98)');
-  cg.addColorStop(0.35, hex4(glow,0.9));
-  cg.addColorStop(1, hex4(glow,0));
-  oc.beginPath(); oc.arc(CX,CY,18,0,Math.PI*2); oc.fillStyle=cg; oc.fill();
+  // Center bright spot
+  const cg = oc.createRadialGradient(CX, CY, 0, CX, CY, 18);
+  cg.addColorStop(0, 'rgba(255,255,255,0.98)');
+  cg.addColorStop(0.35, hex4(glow, 0.9));
+  cg.addColorStop(1, hex4(glow, 0));
+  oc.beginPath(); oc.arc(CX, CY, 18, 0, Math.PI * 2); oc.fillStyle = cg; oc.fill();
 
   drawWaveformRing(t);
 }
