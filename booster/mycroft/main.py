@@ -22,7 +22,7 @@ _RATE      = 16000
 _CHUNK     = 1024
 _CHANNELS  = 1
 _FORMAT    = pyaudio.paInt16
-_SILENCE_THRESHOLD = 400
+_SILENCE_THRESHOLD = 200
 _SILENCE_SECS      = 2.8
 _MAX_SECS          = 30
 
@@ -63,6 +63,7 @@ def record() -> str | None:
     # Reject recordings that never had real speech
     all_shorts = struct.unpack(f"{len(b''.join(frames)) // 2}h", b"".join(frames))
     peak_rms = math.sqrt(sum(s * s for s in all_shorts) / len(all_shorts)) if all_shorts else 0
+    print_status(f"Peak RMS: {round(peak_rms)} (threshold: {_SILENCE_THRESHOLD})")
     if peak_rms < _SILENCE_THRESHOLD or not speech_started:
         return None
 
