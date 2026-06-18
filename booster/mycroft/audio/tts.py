@@ -68,7 +68,7 @@ def _speak_edge(text: str) -> None:
     async def _run():
         tmp = tempfile.mktemp(suffix=".mp3")
         try:
-            await edge_tts.Communicate(text, "sv-SE-SofieNeural").save(tmp)
+            await edge_tts.Communicate(text, "en-GB-SoniaNeural").save(tmp)
             _play_and_wait(tmp)
         finally:
             try:
