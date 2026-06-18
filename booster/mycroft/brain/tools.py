@@ -64,7 +64,7 @@ TOOLS = [
     },
     {
         "name": "youtube_search",
-        "description": "Search YouTube for video tutorials or demonstrations. Use this when the user asks to find or watch a video.",
+        "description": "Search YouTube for video tutorials or demonstrations and automatically opens the top result in the browser. Use this when the user asks to find or watch a video — no need to call open_url afterwards.",
         "input_schema": {
             "type": "object",
             "properties": {

@@ -33,6 +33,9 @@ def youtube_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
                 "channel": item.get("channel", {}).get("name", ""),
                 "duration": item.get("duration", ""),
             })
+        # Always open the top result automatically
+        if results and results[0]["url"]:
+            open_url(results[0]["url"])
         return results
     except Exception as e:
         return [{"title": "YouTube search error", "url": "", "channel": "", "duration": "", "error": str(e)}]
