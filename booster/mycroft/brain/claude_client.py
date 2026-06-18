@@ -1,5 +1,7 @@
 import re
+import json
 from datetime import date
+from pathlib import Path
 from typing import Generator
 
 import anthropic
@@ -7,6 +9,9 @@ import anthropic
 from mycroft.brain.tools import TOOLS, dispatch_tool
 from mycroft.config import Config
 from mycroft.ui.terminal import print_tool_use
+
+_HISTORY_FILE = Path.home() / "gaia_notes" / "session_history.json"
+_PERSIST_TURNS = 30  # how many exchanges to keep across sessions
 
 SYSTEM_PROMPT = """Du är Gaia, en AI-assistent i ett garageverkstad. Du hjälper till med research, \
 beräkningar, geometri, YouTube-tutorials och projektplanering.
@@ -36,7 +41,7 @@ class ClaudeClient:
         self.client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
         self.model = cfg.model
         self.max_history_turns = cfg.max_history_turns
-        self.history: list[dict] = []
+        self.history: list[dict] = self._load_history()
         self.system = SYSTEM_PROMPT.format(date=date.today().isoformat())
 
     def chat(self, user_input: str) -> str:
@@ -102,9 +107,31 @@ class ClaudeClient:
             full_content.append(buf.strip())
             yield buf.strip()
 
-        # Append completed response to history
+        # Append completed response to history and persist
         full_text = " ".join(full_content)
         self.history.append({"role": "assistant", "content": full_text})
+        self._save_history()
+
+    def _load_history(self) -> list[dict]:
+        try:
+            if _HISTORY_FILE.exists():
+                data = json.loads(_HISTORY_FILE.read_text(encoding="utf-8"))
+                # Keep only simple text exchanges (skip tool-use blocks from old sessions)
+                clean = [m for m in data if isinstance(m.get("content"), str)]
+                return clean[-(  _PERSIST_TURNS * 2):]
+        except Exception:
+            pass
+        return []
+
+    def _save_history(self):
+        try:
+            _HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+            # Only persist plain text messages, not tool-call blocks
+            clean = [m for m in self.history if isinstance(m.get("content"), str)]
+            kept = clean[-(  _PERSIST_TURNS * 2):]
+            _HISTORY_FILE.write_text(json.dumps(kept, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
 
     def _trim_history(self):
         max_messages = self.max_history_turns * 2
