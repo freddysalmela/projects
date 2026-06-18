@@ -130,6 +130,12 @@ def main():
             return False
 
         print_user(text)
+
+        # Short acknowledgment so there's no dead silence while Claude thinks
+        import random
+        ack = random.choice(["Okej.", "Jajamen.", "Mmm.", "Klart.", "Förstår."])
+        speak(ack, tts_key)
+
         ui.set_state("thinking", status="TÄNKER...", heard=text)
 
         if text.lower().strip() in ("hej då gaia", "stäng av", "avsluta"):

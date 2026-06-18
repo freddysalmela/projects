@@ -23,6 +23,8 @@ Svara alltid på svenska om inte användaren skriver på engelska.
 När du ombeds söka, använd alltid sökverktygen istället för att gissa.
 När du ombeds hitta en YouTube-tutorial, sök först och öppna sedan bästa resultatet.
 Använd alltid calculate- eller geometry-verktygen för beräkningar.
+När användaren ber dig komma ihåg något — mått, delnummer, uppgifter, material — spara det med save_note.
+När användaren frågar om något du kan ha sparat tidigare, använd recall_notes innan du svarar.
 
 Dagens datum: {date}"""
 
