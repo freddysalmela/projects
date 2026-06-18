@@ -82,7 +82,7 @@ def transcribe(wav_path: str, openai_key: str) -> str:
         result = client.audio.transcriptions.create(
             model="whisper-1",
             file=f,
-            language="sv",
+            language="en",
         )
     os.remove(wav_path)
     return result.text.strip()
@@ -109,7 +109,7 @@ def main():
     webbrowser.open("http://localhost:5050")
     ui.set_state("idle", status="REDO")
 
-    speak("Gaia online. Redo att hjälpa.", tts_key)
+    speak("Gaia online. Ready to help.", tts_key)
 
     from mycroft import state
 
@@ -133,13 +133,13 @@ def main():
 
         # Short acknowledgment so there's no dead silence while Claude thinks
         import random
-        ack = random.choice(["Okej.", "Jajamen.", "Mmm.", "Klart.", "Förstår."])
+        ack = random.choice(["Sure.", "Got it.", "Mm.", "Alright.", "On it."])
         speak(ack, tts_key)
 
         ui.set_state("thinking", status="TÄNKER...", heard=text)
 
-        if text.lower().strip() in ("hej då gaia", "stäng av", "avsluta"):
-            speak("Stänger av. Ha det bra!", tts_key)
+        if text.lower().strip() in ("goodbye gaia", "shut down", "goodbye"):
+            speak("Shutting down. Take care!", tts_key)
             sys.exit(0)
 
         # ── Pipeline: stream sentences → TTS queue → worker thread ─────────
