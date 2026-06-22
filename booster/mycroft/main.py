@@ -110,7 +110,10 @@ def main():
     webbrowser.open("http://localhost:5050")
     ui.set_state("idle", status="REDO")
 
-    speak("Gaia online. Ready to help.", tts_key)
+    from datetime import datetime
+    _hour = datetime.now().hour
+    _greeting = "Good morning" if _hour < 12 else "Good afternoon" if _hour < 18 else "Good evening"
+    speak(f"{_greeting}, sir. Gaia online and ready. How are you today?", tts_key)
 
     from mycroft import state
 
