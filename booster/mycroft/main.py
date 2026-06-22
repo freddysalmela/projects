@@ -114,34 +114,53 @@ def main():
 
     from mycroft import state
 
+    _DISMISS = {
+        "thanks", "thank you", "that's all", "that's all for now",
+        "thanks that's all", "thanks that's all for now",
+        "go to sleep", "stop listening", "stand by",
+    }
+    _SHUTDOWN = {"goodbye gaia", "shut down", "goodbye", "exit"}
+
     def run_once() -> bool:
-        """Run one listen→respond cycle. Returns True if should auto-listen again."""
+        """Run one listen→respond cycle.
+        Returns True  → keep session alive (listen again).
+        Returns False → end session, go idle.
+        """
         state.stop_event.clear()
 
-        ui.set_state("recording", status="LYSSNAR...")
+        ui.set_state("recording", status="LISTENING...")
         wav = record()
-        if wav is None or state.stop_event.is_set():
-            print_status("Hörde ingenting.")
+
+        if state.stop_event.is_set():
             return False
 
-        ui.set_state("thinking", status="TRANSKRIBERAR...")
+        if wav is None:
+            # Silence — stay in session, just loop back quietly
+            return True
+
+        ui.set_state("thinking", status="TRANSCRIBING...")
         text = transcribe(wav, cfg.openai_api_key)
         if not text or state.stop_event.is_set():
-            print_status("Hörde ingenting.")
-            return False
+            return True  # bad transcription — keep session alive
 
         print_user(text)
+        normalised = text.lower().strip().rstrip(".,!")
+
+        if normalised in _SHUTDOWN:
+            speak("Shutting down. Take care!", tts_key)
+            sys.exit(0)
+
+        if normalised in _DISMISS:
+            speak("Alright, I'll stand by.", tts_key)
+            ui.set_state("idle", status="STANDING BY")
+            return False  # end session
 
         # Short acknowledgment so there's no dead silence while Claude thinks
         import random
         ack = random.choice(["Sure.", "Got it.", "Mm.", "Alright.", "On it."])
         speak(ack, tts_key)
 
-        ui.set_state("thinking", status="TÄNKER...", heard=text)
-
-        if text.lower().strip() in ("goodbye gaia", "shut down", "goodbye"):
-            speak("Shutting down. Take care!", tts_key)
-            sys.exit(0)
+        ui.set_state("thinking", status="THINKING...", heard=text)
 
         # ── Pipeline: stream sentences → TTS queue → worker thread ─────────
         tts_q: queue.Queue = queue.Queue()
@@ -168,27 +187,24 @@ def main():
             print(sentence, end=" ", flush=True)
             pending.append(sentence)
 
-            # First chunk: wait for 2 sentences to avoid a single choppy word;
-            # after that flush every sentence so audio overlaps generation.
             threshold = 2 if not first_chunk_sent else 1
             if len(pending) >= threshold:
                 tts_q.put(" ".join(pending))
                 pending.clear()
                 if not first_chunk_sent:
                     first_chunk_sent = True
-                    ui.set_state("speaking", status="TALAR", heard=text)
+                    ui.set_state("speaking", status="SPEAKING", heard=text)
 
-        # Flush any remaining sentences
         if pending and not state.stop_event.is_set():
             tts_q.put(" ".join(pending))
 
-        tts_q.put(None)   # signal worker to exit
-        tts_thread.join() # wait for all audio to finish
+        tts_q.put(None)
+        tts_thread.join()
 
         full_response = " ".join(full_sentences)
         print()
 
-        ui.set_state("speaking", status="TALAR", heard=text, text=full_response)
+        ui.set_state("speaking", status="SPEAKING", heard=text, text=full_response)
         print_mycroft(full_response)
 
         if state.stop_event.is_set():
@@ -197,29 +213,34 @@ def main():
 
     while True:
         try:
-            ui.set_state("idle", status="REDO")
+            ui.set_state("idle", status="PRESS SPACE TO START")
             ui.wait_for_trigger()
         except KeyboardInterrupt:
-            print_status("Avslutar. Hej då!")
+            print_status("Goodbye!")
             sys.exit(0)
+
+        speak("I'm listening.", tts_key)
 
         while True:
             try:
                 should_continue = run_once()
             except KeyboardInterrupt:
-                print_status("Avslutar. Hej då!")
+                print_status("Goodbye!")
                 sys.exit(0)
             except Exception as e:
                 print_error(str(e))
-                ui.set_state("idle", status="FEL — FÖRSÖK IGEN")
+                ui.set_state("idle", status="ERROR — TRY AGAIN")
                 break
 
             if state.stop_event.is_set():
-                ui.set_state("idle", status="AVBRUTEN")
+                ui.set_state("idle", status="STOPPED")
                 break
             if should_continue:
-                time.sleep(0.7)
+                time.sleep(0.4)
             else:
+                break
+
+
                 break
 
 
