@@ -4,6 +4,7 @@ from datetime import datetime
 
 from mycroft.capabilities.search import web_search, youtube_search, open_url
 from mycroft.capabilities.calculator import evaluate_expression, geometry, GEOMETRY_FORMULAS
+from mycroft.capabilities.system import take_screenshot, read_clipboard
 
 _NOTES_DIR = Path.home() / "gaia_notes"
 
@@ -138,6 +139,24 @@ TOOLS = [
             "required": ["query"],
         },
     },
+    {
+        "name": "take_screenshot",
+        "description": "Take a screenshot of the user's screen and analyse it. Use when the user asks what is on screen, wants help with something they are looking at, or says 'look at this' / 'what do you see'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "read_clipboard",
+        "description": "Read the text currently in the clipboard. Use when the user says 'what's in my clipboard', 'I copied something', or pastes a reference to something they copied.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
 ]
 
 
@@ -174,5 +193,11 @@ def dispatch_tool(name: str, inputs: dict) -> str:
 
     if name == "recall_notes":
         return recall_notes(inputs["query"])
+
+    if name == "take_screenshot":
+        return take_screenshot()  # returns dict with "image" key
+
+    if name == "read_clipboard":
+        return read_clipboard()
 
     return f"Unknown tool: {name}"

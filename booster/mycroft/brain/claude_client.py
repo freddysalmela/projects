@@ -30,6 +30,8 @@ When asked to find a YouTube tutorial, search first then open the best result.
 Always use the calculate or geometry tools for any calculations.
 When the user asks you to remember something — measurements, part numbers, tasks, materials — save it with save_note.
 When the user asks about something you may have saved before, use recall_notes before answering.
+When the user asks what is on screen, what they are looking at, or says "look at this", use take_screenshot.
+When the user mentions something they copied or asks about their clipboard, use read_clipboard.
 
 Today's date: {date}"""
 
@@ -70,10 +72,27 @@ class ClaudeClient:
                     if block.type == "tool_use":
                         print_tool_use(block.name, block.input)
                         result = dispatch_tool(block.name, block.input)
+                        # Screenshot tool returns a dict with an "image" key
+                        if isinstance(result, dict) and result.get("image"):
+                            content = [
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "image/png",
+                                        "data": result["image"],
+                                    },
+                                },
+                                {"type": "text", "text": result.get("text", "Screenshot captured.")},
+                            ]
+                        elif isinstance(result, dict):
+                            content = result.get("text", str(result))
+                        else:
+                            content = result
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
-                            "content": result,
+                            "content": content,
                         })
                 self.history.append({"role": "user", "content": tool_results})
                 continue

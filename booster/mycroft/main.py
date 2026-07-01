@@ -116,6 +116,11 @@ def main():
     speak(f"{_greeting}, sir. Gaia online and ready. How are you today?", tts_key)
 
     from mycroft import state
+    from mycroft.capabilities.briefing import morning_briefing
+
+    briefing = morning_briefing()
+    if briefing:
+        speak(briefing, tts_key)
 
     _DISMISS = {
         "thanks", "thank you", "that's all", "that's all for now",
