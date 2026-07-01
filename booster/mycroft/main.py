@@ -122,6 +122,16 @@ def main():
     if briefing:
         speak(briefing, tts_key)
 
+    # Wake word — optional; falls back to spacebar if not configured
+    _use_wake_word = bool(cfg.porcupine_access_key and cfg.wake_word_path)
+    if _use_wake_word:
+        from mycroft.capabilities import wake_word as _ww
+        _ww.start(cfg.porcupine_access_key, cfg.wake_word_path, ui.trigger)
+        print_status("Wake word active — say Hey Gaia to start.")
+        _idle_label = "SAY HEY GAIA..."
+    else:
+        _idle_label = "PRESS SPACE TO START"
+
     _DISMISS = {
         "thanks", "thank you", "that's all", "that's all for now",
         "thanks that's all", "thanks that's all for now",
@@ -221,11 +231,14 @@ def main():
 
     while True:
         try:
-            ui.set_state("idle", status="PRESS SPACE TO START")
+            ui.set_state("idle", status=_idle_label)
             ui.wait_for_trigger()
         except KeyboardInterrupt:
             print_status("Goodbye!")
             sys.exit(0)
+
+        if _use_wake_word:
+            _ww.set_session_active(True)
 
         speak("I'm listening.", tts_key)
 
@@ -247,6 +260,9 @@ def main():
                 time.sleep(0.4)
             else:
                 break
+
+        if _use_wake_word:
+            _ww.set_session_active(False)
 
 
                 break

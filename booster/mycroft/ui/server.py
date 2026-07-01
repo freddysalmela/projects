@@ -251,6 +251,11 @@ def set_state(state: str, **kwargs):
     _sio.emit("state", {"state": state, **kwargs})
 
 
+def trigger():
+    """Programmatically fire the same event as the spacebar / HUD button."""
+    _trigger_queue.put(True)
+
+
 def wait_for_trigger():
     _trigger_queue.get()
 
