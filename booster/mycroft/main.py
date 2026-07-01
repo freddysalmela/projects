@@ -135,6 +135,7 @@ def main():
         print_status(f"Wake word unavailable ({_ww_err}), using spacebar.")
         _idle_label = "PRESS SPACE TO START"
 
+    _MUTE = {"mute", "stop", "stop talking", "be quiet", "quiet", "silence", "shut up"}
     _DISMISS = {
         "thanks", "thank you", "that's all", "that's all for now",
         "thanks that's all", "thanks that's all for now",
@@ -170,6 +171,11 @@ def main():
         if normalised in _SHUTDOWN:
             speak("Shutting down. Take care!", tts_key)
             sys.exit(0)
+
+        if normalised in _MUTE:
+            state.stop_event.set()
+            ui.set_state("idle", status=_idle_label)
+            return False  # silent — no verbal response
 
         if normalised in _DISMISS:
             speak("Alright, I'll stand by.", tts_key)
