@@ -5,6 +5,7 @@ from datetime import datetime
 from mycroft.capabilities.search import web_search, youtube_search, open_url
 from mycroft.capabilities.calculator import evaluate_expression, geometry, GEOMETRY_FORMULAS
 from mycroft.capabilities.system import take_screenshot, read_clipboard
+from mycroft.capabilities.computer import mouse_click, double_click, keyboard_type, key_press, scroll
 
 _NOTES_DIR = Path.home() / "gaia_notes"
 
@@ -157,6 +158,65 @@ TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "mouse_click",
+        "description": "Click the mouse at specific screen coordinates. Always take a screenshot first to see the screen and calculate the correct coordinates using the scale factor provided.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer", "description": "X coordinate in actual screen pixels"},
+                "y": {"type": "integer", "description": "Y coordinate in actual screen pixels"},
+                "button": {"type": "string", "enum": ["left", "right", "middle"], "description": "Mouse button (default: left)"},
+            },
+            "required": ["x", "y"],
+        },
+    },
+    {
+        "name": "double_click",
+        "description": "Double-click at screen coordinates. Use to open files, apps, or select a word.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer", "description": "X coordinate in actual screen pixels"},
+                "y": {"type": "integer", "description": "Y coordinate in actual screen pixels"},
+            },
+            "required": ["x", "y"],
+        },
+    },
+    {
+        "name": "keyboard_type",
+        "description": "Type a string of text using the keyboard. Click the target input field first, then use this tool.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to type"},
+            },
+            "required": ["text"],
+        },
+    },
+    {
+        "name": "key_press",
+        "description": "Press a key or keyboard shortcut. Examples: 'enter', 'escape', 'tab', 'space', 'ctrl+v', 'ctrl+c', 'ctrl+a', 'win', 'alt+f4', 'ctrl+shift+t'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Key name or hotkey combo using + separator, e.g. 'enter' or 'ctrl+v'"},
+            },
+            "required": ["key"],
+        },
+    },
+    {
+        "name": "scroll",
+        "description": "Scroll the mouse wheel up or down at the current cursor position.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "direction": {"type": "string", "enum": ["up", "down"], "description": "Scroll direction"},
+                "amount": {"type": "integer", "description": "Number of scroll clicks (default 3)"},
+            },
+            "required": ["direction"],
+        },
+    },
 ]
 
 
@@ -199,5 +259,20 @@ def dispatch_tool(name: str, inputs: dict) -> str:
 
     if name == "read_clipboard":
         return read_clipboard()
+
+    if name == "mouse_click":
+        return mouse_click(inputs["x"], inputs["y"], inputs.get("button", "left"))
+
+    if name == "double_click":
+        return double_click(inputs["x"], inputs["y"])
+
+    if name == "keyboard_type":
+        return keyboard_type(inputs["text"])
+
+    if name == "key_press":
+        return key_press(inputs["key"])
+
+    if name == "scroll":
+        return scroll(inputs["direction"], inputs.get("amount", 3))
 
     return f"Unknown tool: {name}"

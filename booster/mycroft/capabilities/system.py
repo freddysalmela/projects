@@ -7,12 +7,20 @@ def take_screenshot() -> dict:
     try:
         from PIL import ImageGrab
         img = ImageGrab.grab()
-        img.thumbnail((1600, 900))  # cap size to keep token cost reasonable
+        actual_w, actual_h = img.size
+        img.thumbnail((1280, 720))
+        preview_w, preview_h = img.size
+        scale_x = round(actual_w / preview_w, 2)
+        scale_y = round(actual_h / preview_h, 2)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         b64 = base64.b64encode(buf.getvalue()).decode()
-        w, h = img.size
-        return {"image": b64, "text": f"Screenshot captured ({w}x{h} px)."}
+        text = (
+            f"Screenshot: {preview_w}x{preview_h} preview "
+            f"(actual screen: {actual_w}x{actual_h}, scale {scale_x}x). "
+            f"To click at preview position (px, py), use mouse_click(round(px*{scale_x}), round(py*{scale_y}))."
+        )
+        return {"image": b64, "text": text}
     except Exception as e:
         return {"image": None, "text": f"Screenshot failed: {e}"}
 

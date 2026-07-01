@@ -32,6 +32,10 @@ When the user asks you to remember something — measurements, part numbers, tas
 When the user asks about something you may have saved before, use recall_notes before answering.
 When the user asks what is on screen, what they are looking at, or says "look at this", use take_screenshot.
 When the user mentions something they copied or asks about their clipboard, use read_clipboard.
+When the user asks you to open an app, click something, navigate a website, control Spotify, or interact with anything on the computer: \
+take a screenshot first to see the current state, then use mouse_click with scaled coordinates, keyboard_type to enter text, \
+and key_press for Enter/Escape/shortcuts. After each action take another screenshot to verify and continue until done. \
+The screenshot text tells you the scale factor — multiply preview coordinates by that factor to get real screen coordinates.
 
 Today's date: {date}"""
 
