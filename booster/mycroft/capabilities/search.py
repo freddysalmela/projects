@@ -18,6 +18,7 @@ def web_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
                 })
         return results
     except Exception as e:
+        print(f"[search] ERROR: {e}", flush=True)
         return [{"title": "Search error", "url": "", "snippet": str(e)}]
 
 
@@ -38,6 +39,7 @@ def youtube_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
             open_url(results[0]["url"])
         return results
     except Exception as e:
+        print(f"[youtube] ERROR: {e}", flush=True)
         return [{"title": "YouTube search error", "url": "", "channel": "", "duration": "", "error": str(e)}]
 
 
