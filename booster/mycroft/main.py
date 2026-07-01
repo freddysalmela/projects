@@ -268,8 +268,5 @@ def main():
             _ww.set_session_active(False)
 
 
-                break
-
-
 if __name__ == "__main__":
     main()
