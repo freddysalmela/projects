@@ -122,14 +122,17 @@ def main():
     if briefing:
         speak(briefing, tts_key)
 
-    # Wake word — optional; falls back to spacebar if not configured
-    _use_wake_word = bool(cfg.porcupine_access_key and cfg.wake_word_path)
-    if _use_wake_word:
+    # Wake word — tries to start openwakeword; falls back to spacebar on error
+    _use_wake_word = False
+    try:
         from mycroft.capabilities import wake_word as _ww
-        _ww.start(cfg.porcupine_access_key, cfg.wake_word_path, ui.trigger)
-        print_status("Wake word active — say Hey Gaia to start.")
-        _idle_label = "SAY HEY GAIA..."
-    else:
+        _ww.start(cfg.wake_word_model, ui.trigger)
+        _wake_label = cfg.wake_word_model.replace("_", " ").upper()
+        print_status(f"Wake word active — say '{_wake_label}' to start.")
+        _idle_label = f"SAY {_wake_label}..."
+        _use_wake_word = True
+    except Exception as _ww_err:
+        print_status(f"Wake word unavailable ({_ww_err}), using spacebar.")
         _idle_label = "PRESS SPACE TO START"
 
     _DISMISS = {

@@ -1,8 +1,11 @@
-import struct
 import threading
+import numpy as np
 import pyaudio
 
 _session_active = threading.Event()
+_CHUNK = 1280   # 80ms at 16kHz — openwakeword's preferred frame size
+_RATE  = 16000
+_THRESHOLD = 0.5
 
 
 def set_session_active(active: bool):
@@ -12,33 +15,40 @@ def set_session_active(active: bool):
         _session_active.clear()
 
 
-def start(access_key: str, keyword_path: str, on_detected) -> threading.Thread:
-    """Start a background thread that fires on_detected() when the wake word is heard."""
-    import pvporcupine
+def start(model_name: str, on_detected, threshold: float = _THRESHOLD) -> threading.Thread:
+    """Download model if needed, then listen in the background.
+    Calls on_detected() whenever the wake word is heard outside an active session."""
+    import openwakeword
+    from openwakeword.model import Model
 
-    porcupine = pvporcupine.create(access_key=access_key, keyword_paths=[keyword_path])
+    openwakeword.utils.download_models()
+    oww = Model(wakeword_models=[model_name], inference_framework="onnx")
+
     pa = pyaudio.PyAudio()
     stream = pa.open(
-        rate=porcupine.sample_rate,
+        rate=_RATE,
         channels=1,
         format=pyaudio.paInt16,
         input=True,
-        frames_per_buffer=porcupine.frame_length,
+        frames_per_buffer=_CHUNK,
     )
 
     def _loop():
         try:
             while True:
-                pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
+                audio = np.frombuffer(
+                    stream.read(_CHUNK, exception_on_overflow=False),
+                    dtype=np.int16,
+                )
                 if _session_active.is_set():
-                    continue  # already in a session, ignore
-                pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
-                if porcupine.process(pcm) >= 0:
+                    continue
+                prediction = oww.predict(audio)
+                if any(score >= threshold for score in prediction.values()):
+                    oww.reset()
                     on_detected()
         finally:
             stream.close()
             pa.terminate()
-            porcupine.delete()
 
     t = threading.Thread(target=_loop, daemon=True, name="wake-word")
     t.start()
