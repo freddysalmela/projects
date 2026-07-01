@@ -5,7 +5,7 @@ import pyaudio
 _session_active = threading.Event()
 _CHUNK = 1280   # 80ms at 16kHz — openwakeword's preferred frame size
 _RATE  = 16000
-_THRESHOLD = 0.5
+_THRESHOLD = 0.3
 
 
 def set_session_active(active: bool):
@@ -43,9 +43,12 @@ def start(model_name: str, on_detected, threshold: float = _THRESHOLD) -> thread
                 if _session_active.is_set():
                     continue
                 prediction = oww.predict(audio)
-                if any(score >= threshold for score in prediction.values()):
-                    oww.reset()
-                    on_detected()
+                for mdl, score in prediction.items():
+                    if score >= threshold:
+                        print(f"[wake] {mdl} score={score:.2f} — triggered", flush=True)
+                        oww.reset()
+                        on_detected()
+                        break
         finally:
             stream.close()
             pa.terminate()
