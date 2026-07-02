@@ -1,0 +1,18 @@
+# ── Wake word ──────────────────────────────────────────────────────────────────
+wake_word: hey_jarvis   # openwakeword model name
+threshold: 0.4          # detection sensitivity (0.0–1.0, lower = more sensitive)
+
+# ── Main PC — Wake on LAN ──────────────────────────────────────────────────────
+# Find your PC's MAC: run  ipconfig /all  in Windows cmd, look for "Physical Address"
+pc_mac: "AA:BB:CC:DD:EE:FF"
+
+# ── Lights — TP-Link Kasa (recommended) ───────────────────────────────────────
+# Set static IPs for your Kasa devices in your router's DHCP settings, list them here.
+# Leave empty if not using Kasa.
+kasa_devices:
+  - "192.168.1.101"
+  # - "192.168.1.102"   # add more devices as needed
+
+# ── Lights — GPIO relay (alternative to Kasa) ──────────────────────────────────
+# BCM pin numbers connected to relay IN pins. Leave empty if not using GPIO.
+gpio_relay_pins: []

@@ -1,0 +1,7 @@
+openwakeword>=0.6.0
+tflite-runtime>=2.14.0   # lighter than onnxruntime on Pi ARM
+numpy>=1.24.0
+pyaudio>=0.2.11
+wakeonlan>=3.0.0
+python-kasa>=0.7.0
+PyYAML>=6.0.0
