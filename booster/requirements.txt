@@ -18,6 +18,7 @@ Pillow>=10.0.0
 pyautogui>=0.9.54
 pywinauto>=0.6.8
 mss>=9.0.0
+cartesia>=1.0.0
 pyperclip>=1.8.0
 openwakeword>=0.6.0
 onnxruntime>=1.16.0
