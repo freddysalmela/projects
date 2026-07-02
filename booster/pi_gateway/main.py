@@ -1,13 +1,13 @@
 """
 Gaia Gateway — runs on a Raspberry Pi at the garage entrance.
 Listens for the wake phrase, then:
-  1. Turns on configured smart lights (TP-Link Kasa)
+  1. Turns on configured smart lights (Shelly devices via local HTTP)
   2. Sends a Wake-on-LAN magic packet to the main PC
 """
 
-import asyncio
 import time
 import yaml
+import requests
 import numpy as np
 import pyaudio
 from pathlib import Path
@@ -29,15 +29,16 @@ def _wake_pc(mac: str):
     print(f"[gateway] WoL sent to {mac}", flush=True)
 
 
-async def _turn_on_kasa(ips: list[str]):
-    from kasa import SmartPlug, SmartBulb, Discover
+def _turn_on_shelly(ips: list[str]):
+    """Shelly devices expose a simple local REST API — no library needed."""
     for ip in ips:
         try:
-            device = await Discover.discover_single(ip)
-            await device.turn_on()
-            print(f"[gateway] Turned on Kasa device at {ip}", flush=True)
+            # Works for Shelly Plug S, Shelly 1, Shelly 2.5, Shelly Plus, etc.
+            r = requests.get(f"http://{ip}/relay/0?turn=on", timeout=3)
+            r.raise_for_status()
+            print(f"[gateway] Shelly ON: {ip}", flush=True)
         except Exception as e:
-            print(f"[gateway] Kasa error {ip}: {e}", flush=True)
+            print(f"[gateway] Shelly error {ip}: {e}", flush=True)
 
 
 def _toggle_gpio(pins: list[int], state: bool):
@@ -47,15 +48,15 @@ def _toggle_gpio(pins: list[int], state: bool):
         for pin in pins:
             GPIO.setup(pin, GPIO.OUT)
             GPIO.output(pin, GPIO.HIGH if state else GPIO.LOW)
-        print(f"[gateway] GPIO pins {pins} set to {'HIGH' if state else 'LOW'}", flush=True)
+        print(f"[gateway] GPIO pins {pins} → {'HIGH' if state else 'LOW'}", flush=True)
     except Exception as e:
         print(f"[gateway] GPIO error: {e}", flush=True)
 
 
 def _activate(cfg: dict):
-    kasa = cfg.get("kasa_devices", [])
-    if kasa:
-        asyncio.run(_turn_on_kasa(kasa))
+    shelly = cfg.get("shelly_devices", [])
+    if shelly:
+        _turn_on_shelly(shelly)
 
     gpio_pins = cfg.get("gpio_relay_pins", [])
     if gpio_pins:
@@ -68,8 +69,8 @@ def _activate(cfg: dict):
 
 def main():
     cfg = _load_config()
-    wake_word   = cfg.get("wake_word", "hey_jarvis")
-    threshold   = float(cfg.get("threshold", 0.4))
+    wake_word = cfg.get("wake_word", "hey_jarvis")
+    threshold = float(cfg.get("threshold", 0.4))
 
     import openwakeword
     from openwakeword.model import Model
@@ -102,7 +103,7 @@ def main():
                         break
                     last_trigger = now
                     oww.reset()
-                    print(f"[gateway] '{mdl}' detected (score={score:.2f}) — activating!", flush=True)
+                    print(f"[gateway] '{mdl}' score={score:.2f} — activating!", flush=True)
                     _activate(cfg)
                     break
     finally:

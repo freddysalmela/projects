@@ -6,13 +6,14 @@ threshold: 0.4          # detection sensitivity (0.0–1.0, lower = more sensiti
 # Find your PC's MAC: run  ipconfig /all  in Windows cmd, look for "Physical Address"
 pc_mac: "AA:BB:CC:DD:EE:FF"
 
-# ── Lights — TP-Link Kasa (recommended) ───────────────────────────────────────
-# Set static IPs for your Kasa devices in your router's DHCP settings, list them here.
-# Leave empty if not using Kasa.
-kasa_devices:
+# ── Lights — Shelly (recommended for Finland) ──────────────────────────────────
+# Set static IPs for your Shelly devices in your router's DHCP settings, list them here.
+# Shelly Plug S and all other Shelly Gen1/Gen2 devices use the same API.
+# Leave empty if not using Shelly.
+shelly_devices:
   - "192.168.1.101"
-  # - "192.168.1.102"   # add more devices as needed
+  # - "192.168.1.102"   # add more as needed
 
-# ── Lights — GPIO relay (alternative to Kasa) ──────────────────────────────────
-# BCM pin numbers connected to relay IN pins. Leave empty if not using GPIO.
+# ── Lights — GPIO relay (alternative to Shelly) ────────────────────────────────
+# BCM pin numbers connected to relay IN pins. Leave empty if not using GPIO relay.
 gpio_relay_pins: []
