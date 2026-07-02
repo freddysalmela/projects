@@ -13,14 +13,14 @@ def take_screenshot() -> dict:
         scale_x = round(actual_w / preview_w, 2)
         scale_y = round(actual_h / preview_h, 2)
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        img.save(buf, format="JPEG", quality=85)
         b64 = base64.b64encode(buf.getvalue()).decode()
         text = (
             f"Screenshot: {preview_w}x{preview_h} preview "
             f"(actual screen: {actual_w}x{actual_h}, scale {scale_x}x). "
             f"To click at preview position (px, py), use mouse_click(round(px*{scale_x}), round(py*{scale_y}))."
         )
-        return {"image": b64, "text": text}
+        return {"image": b64, "text": text, "media_type": "image/jpeg"}
     except Exception as e:
         return {"image": None, "text": f"Screenshot failed: {e}"}
 
