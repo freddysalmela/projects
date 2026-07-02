@@ -3,15 +3,23 @@ import io
 
 
 def take_screenshot() -> dict:
-    """Capture the screen and return a base64-encoded PNG for Claude vision."""
+    """Capture the screen with mss (3-5x faster than Pillow ImageGrab) and return JPEG for Claude vision."""
     try:
-        from PIL import ImageGrab
-        img = ImageGrab.grab()
-        actual_w, actual_h = img.size
+        import mss
+        import mss.tools
+        from PIL import Image
+
+        with mss.mss() as sct:
+            monitor = sct.monitors[0]  # full virtual screen (all monitors combined)
+            raw = sct.grab(monitor)
+            actual_w, actual_h = raw.width, raw.height
+            img = Image.frombytes("RGB", (actual_w, actual_h), raw.rgb)
+
         img.thumbnail((1280, 720))
         preview_w, preview_h = img.size
         scale_x = round(actual_w / preview_w, 2)
         scale_y = round(actual_h / preview_h, 2)
+
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
         b64 = base64.b64encode(buf.getvalue()).decode()

@@ -5,7 +5,7 @@ from datetime import datetime
 from mycroft.capabilities.search import web_search, youtube_search, open_url
 from mycroft.capabilities.calculator import evaluate_expression, geometry, GEOMETRY_FORMULAS
 from mycroft.capabilities.system import take_screenshot, read_clipboard
-from mycroft.capabilities.computer import mouse_click, double_click, keyboard_type, key_press, scroll
+from mycroft.capabilities.computer import mouse_click, double_click, keyboard_type, key_press, scroll, find_and_click, focus_window, list_windows
 
 _NOTES_DIR = Path.home() / "gaia_notes"
 
@@ -217,6 +217,34 @@ TOOLS = [
             "required": ["direction"],
         },
     },
+    {
+        "name": "list_windows",
+        "description": "List all open window titles on the screen. Use this first when you need to interact with a specific app — it tells you the exact window title to use with focus_window or find_and_click.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "focus_window",
+        "description": "Bring an app window to the foreground by its title. Use before interacting with it. Faster than taking a screenshot to find it.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Partial window title, e.g. 'Spotify', 'Chrome', 'Notepad'"},
+            },
+            "required": ["title"],
+        },
+    },
+    {
+        "name": "find_and_click",
+        "description": "Click a button or UI element in an app by name — no screenshot or coordinates needed. Works for most standard Windows apps, browsers, Spotify, File Explorer. Use this before falling back to mouse_click with coordinates.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "window_title": {"type": "string", "description": "Partial title of the app window, e.g. 'Spotify'"},
+                "control_name": {"type": "string", "description": "Name of the button or control to click, e.g. 'Play', 'Search', 'Close'"},
+            },
+            "required": ["window_title", "control_name"],
+        },
+    },
 ]
 
 
@@ -276,5 +304,14 @@ def dispatch_tool(name: str, inputs: dict) -> str:
 
     if name == "scroll":
         return scroll(inputs["direction"], inputs.get("amount", 3))
+
+    if name == "list_windows":
+        return list_windows()
+
+    if name == "focus_window":
+        return focus_window(inputs["title"])
+
+    if name == "find_and_click":
+        return find_and_click(inputs["window_title"], inputs["control_name"])
 
     return f"Unknown tool: {name}"

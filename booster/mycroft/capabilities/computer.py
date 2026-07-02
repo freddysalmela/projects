@@ -1,3 +1,12 @@
+"""
+Computer control — two layers:
+1. Windows UI Automation via pywinauto (primary): click by element name/title, no screenshot needed
+2. pyautogui (fallback): coordinate-based clicks for apps without accessibility trees (games, Electron, etc.)
+"""
+
+
+# ── pyautogui helpers (coordinate-based fallback) ─────────────────────────────
+
 def _pg():
     import pyautogui
     pyautogui.PAUSE = 0.1
@@ -49,3 +58,46 @@ def scroll(direction: str, amount: int = 3) -> str:
         return f"Scrolled {direction} by {amount}."
     except Exception as e:
         return f"scroll failed: {e}"
+
+
+# ── Windows UI Automation via pywinauto (faster — no screenshot needed) ───────
+
+def find_and_click(window_title: str, control_name: str) -> str:
+    """Find a UI element by window title + control name and click it without a screenshot.
+    Works for standard Windows apps, browsers, Spotify, File Explorer, etc.
+    Falls back gracefully if the window or control isn't found."""
+    try:
+        from pywinauto import Application, Desktop
+        from pywinauto.findwindows import ElementNotFoundError
+
+        # Find the window (partial title match)
+        desktop = Desktop(backend="uia")
+        win = desktop.window(title_re=f".*{window_title}.*")
+        win.set_focus()
+
+        ctrl = win.child_window(title_re=f".*{control_name}.*", control_type="Button")
+        ctrl.click_input()
+        return f"Clicked '{control_name}' in '{window_title}'."
+    except Exception as e:
+        return f"find_and_click failed (try mouse_click with coordinates instead): {e}"
+
+
+def focus_window(title: str) -> str:
+    """Bring a window to the foreground by its title."""
+    try:
+        from pywinauto import Desktop
+        win = Desktop(backend="uia").window(title_re=f".*{title}.*")
+        win.set_focus()
+        return f"Focused window matching '{title}'."
+    except Exception as e:
+        return f"focus_window failed: {e}"
+
+
+def list_windows() -> str:
+    """List all currently open window titles — useful before using focus_window or find_and_click."""
+    try:
+        from pywinauto import Desktop
+        titles = [w.window_text() for w in Desktop(backend="uia").windows() if w.window_text().strip()]
+        return "Open windows:\n" + "\n".join(f"  - {t}" for t in titles)
+    except Exception as e:
+        return f"list_windows failed: {e}"
