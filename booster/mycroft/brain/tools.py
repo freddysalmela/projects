@@ -255,7 +255,9 @@ def dispatch_tool(name: str, inputs: dict) -> str:
         return recall_notes(inputs["query"])
 
     if name == "take_screenshot":
-        return take_screenshot()  # returns dict with "image" key
+        result = take_screenshot()
+        print(f"[screenshot] {'OK' if result.get('image') else 'FAILED'}: {result.get('text', '')}", flush=True)
+        return result
 
     if name == "read_clipboard":
         return read_clipboard()
