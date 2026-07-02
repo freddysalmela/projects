@@ -1,16 +1,58 @@
 import os
+import math
+import struct
 import time
 import tempfile
+import threading
 
 from mycroft import state
 
+# RMS level above which we treat incoming audio as intentional speech (barge-in).
+# Higher than the recording threshold so speaker bleed doesn't trigger it.
+_BARGE_IN_THRESHOLD = 600
+_BARGE_IN_CONFIRM_CHUNKS = 3   # must exceed threshold this many times in a row
+
+
+def _barge_in_listener() -> None:
+    """Monitor the mic during TTS. If the user speaks, stop playback immediately."""
+    import pyaudio
+    _RATE, _CHUNK = 16000, 1024
+    pa = pyaudio.PyAudio()
+    try:
+        stream = pa.open(format=pyaudio.paInt16, channels=1, rate=_RATE,
+                         input=True, frames_per_buffer=_CHUNK)
+        consecutive = 0
+        # Brief warm-up delay so the start of Gaia's own voice doesn't trigger it
+        time.sleep(0.4)
+        while not state.stop_event.is_set():
+            data = stream.read(_CHUNK, exception_on_overflow=False)
+            shorts = struct.unpack(f"{len(data) // 2}h", data)
+            rms = math.sqrt(sum(s * s for s in shorts) / len(shorts)) if shorts else 0
+            if rms > _BARGE_IN_THRESHOLD:
+                consecutive += 1
+                if consecutive >= _BARGE_IN_CONFIRM_CHUNKS:
+                    state.stop_event.set()
+                    break
+            else:
+                consecutive = 0
+        stream.stop_stream()
+        stream.close()
+    except Exception:
+        pass
+    finally:
+        pa.terminate()
+
 
 def _play_and_wait(tmp: str) -> None:
-    """Play an audio file through the system default output (same device as Spotify/browser)."""
+    """Play audio; start a barge-in listener so the user can interrupt instantly."""
     import sounddevice as sd
     import soundfile as sf
 
     data, samplerate = sf.read(tmp, dtype="float32")
+
+    barge_in = threading.Thread(target=_barge_in_listener, daemon=True)
+    barge_in.start()
+
     sd.play(data, samplerate)
     while sd.get_stream().active:
         if state.stop_event.is_set():
