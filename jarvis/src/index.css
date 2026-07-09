@@ -1,0 +1,35 @@
+:root {
+  --cyan: #4de8ff;
+  --cyan-dim: #1c7a8c;
+  --bg-deep: #010a0d;
+  --bg-panel: #04141899;
+  --font-hud: 'Orbitron', 'Share Tech Mono', sans-serif;
+  --font-mono: 'Share Tech Mono', ui-monospace, monospace;
+
+  color-scheme: dark;
+  color: #d8f7ff;
+  background: var(--bg-deep);
+  font-family: var(--font-mono);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg-deep);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+button {
+  font-family: inherit;
+}

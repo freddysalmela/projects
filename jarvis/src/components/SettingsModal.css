@@ -1,0 +1,74 @@
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 8, 10, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.settings-panel {
+  width: 420px;
+  max-width: 90vw;
+  background: rgba(4, 20, 24, 0.95);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 40px rgba(64, 224, 255, 0.25);
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-header {
+  font-family: var(--font-hud);
+  letter-spacing: 0.3em;
+  font-size: 0.85rem;
+  color: var(--cyan);
+  border-bottom: 1px solid var(--cyan-dim);
+  padding-bottom: 10px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--cyan-dim);
+  letter-spacing: 0.05em;
+}
+
+.settings-field input[type="text"],
+.settings-field input[type="password"] {
+  background: rgba(64, 224, 255, 0.06);
+  border: 1px solid var(--cyan-dim);
+  color: #d8f7ff;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.settings-field input:focus {
+  outline: none;
+  border-color: var(--cyan);
+}
+
+.settings-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-note {
+  font-size: 0.72rem;
+  color: var(--cyan-dim);
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}

@@ -1,0 +1,69 @@
+.transcript {
+  width: 100%;
+  max-width: 560px;
+  border: 1px solid var(--cyan-dim);
+  background: rgba(4, 20, 24, 0.55);
+  box-shadow: 0 0 18px rgba(64, 224, 255, 0.12), inset 0 0 30px rgba(64, 224, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 260px;
+}
+
+.transcript-header {
+  font-family: var(--font-hud);
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: var(--cyan-dim);
+  border-bottom: 1px solid var(--cyan-dim);
+  padding: 8px 14px;
+}
+
+.transcript-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transcript-empty {
+  color: var(--cyan-dim);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.transcript-line {
+  display: flex;
+  gap: 10px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.transcript-speaker {
+  font-family: var(--font-hud);
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  padding-top: 2px;
+  min-width: 52px;
+  color: var(--cyan-dim);
+}
+
+.transcript-line--user .transcript-speaker { color: #ffd23f; }
+.transcript-line--assistant .transcript-speaker { color: var(--cyan); }
+
+.transcript-text {
+  color: #d8f7ff;
+}
+
+.transcript-line--interim .transcript-text {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.transcript-body::-webkit-scrollbar {
+  width: 6px;
+}
+.transcript-body::-webkit-scrollbar-thumb {
+  background: var(--cyan-dim);
+}
