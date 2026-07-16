@@ -1,33 +1,26 @@
-# Run this once as Administrator to register Gaia as a startup task.
-# Usage: Right-click setup_autostart.ps1 -> "Run with PowerShell"
+# Creates a shortcut in your Windows Startup folder so Gaia launches at login.
+# No admin rights required.
+# Usage: Right-click -> "Run with PowerShell"
 
-$taskName = "Gaia Assistant"
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$launcher  = Join-Path $scriptDir "gaia_autostart.bat"
+$boosterDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
+$launcher     = Join-Path $boosterDir "gaia_autostart.bat"
+$startupDir   = [Environment]::GetFolderPath("Startup")
+$shortcutPath = Join-Path $startupDir "Gaia Assistant.lnk"
 
-$action   = New-ScheduledTaskAction `
-    -Execute "cmd.exe" `
-    -Argument "/c `"$launcher`"" `
-    -WorkingDirectory $scriptDir
-
-$trigger  = New-ScheduledTaskTrigger -AtLogOn
-
-$settings = New-ScheduledTaskSettingsSet `
-    -ExecutionTimeLimit 0 `
-    -RestartCount 3 `
-    -RestartInterval (New-TimeSpan -Minutes 2) `
-    -StartWhenAvailable
-
-Register-ScheduledTask `
-    -TaskName $taskName `
-    -Action $action `
-    -Trigger $trigger `
-    -Settings $settings `
-    -RunLevel Highest `
-    -Force | Out-Null
+$shell        = New-Object -ComObject WScript.Shell
+$shortcut     = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath      = $launcher
+$shortcut.WorkingDirectory = $boosterDir
+$shortcut.WindowStyle     = 1  # Normal window (visible console)
+$shortcut.Description     = "Gaia Voice Assistant"
+$shortcut.Save()
 
 Write-Host ""
-Write-Host "Done. Gaia will start automatically at next login." -ForegroundColor Green
-Write-Host "To remove: Unregister-ScheduledTask -TaskName '$taskName' -Confirm:`$false"
+Write-Host "Done! Shortcut created:" -ForegroundColor Green
+Write-Host "  $shortcutPath"
+Write-Host ""
+Write-Host "Gaia will start automatically at next login."
+Write-Host "To remove autostart: delete the shortcut above, or run:"
+Write-Host "  Remove-Item '$shortcutPath'"
 Write-Host ""
 Pause
