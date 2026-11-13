@@ -39,7 +39,7 @@ After a `git pull`, update the packages with:
 venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-**Start with Windows:** right-click `setup_autostart.ps1` → *Run with PowerShell*, once.
+**Start with Windows:** double-click `setup_autostart.bat` once. `remove_autostart.bat` turns it off again.
 
 ## Settings
 
