@@ -1,18 +1,24 @@
-booster:
-  model: claude-sonnet-5
+gaia:
+  model: claude-sonnet-5          # any Claude model ID; MYCROFT_MODEL in .env overrides
   max_history_turns: 20
+  wake_word_model: hey_jarvis
+  wake_word_threshold: 0.3        # lower = triggers more easily
 
 audio:
-  stt_backend: google       # google | whisper
-  tts_backend: pyttsx3         # gtts | pyttsx3
-  whisper_model: tiny       # tiny | base | small
-  wake_mode: wake_word      # wake_word | push_to_talk
-  speech_timeout: 5
-  pause_threshold: 0.8
+  input_device:                   # part of a mic name, e.g. "USB"; blank = Windows default
+  output_device:                  # part of a speaker name; blank = Windows default
+  silence_threshold: 200          # mic level that counts as speech
+  silence_secs: 2.8               # pause that ends a command; lower = faster replies
+  max_record_secs: 30
+  session_timeout_secs: 20        # no speech for this long = back to standby (0 = never)
+  stt_model: whisper-1
+  barge_in: false                 # true = any loud sound stops her talking (bad in a noisy garage)
+  barge_in_threshold: 600         # saying the wake word while she talks always interrupts
+
+ui:
+  host: 127.0.0.1                 # 0.0.0.0 to open the HUD from other devices on the network
+  port: 5050
+  open_browser: true
 
 search:
   max_results: 5
-
-planner:
-  save_plans: true
-  plans_directory: ~/booster_plans

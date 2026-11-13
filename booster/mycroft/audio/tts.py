@@ -1,113 +1,164 @@
+"""Text to speech. Tries Cartesia, then ElevenLabs, then edge-tts, using whichever keys are set."""
 import os
-import math
-import struct
+import re
 import time
 import tempfile
 import threading
 
 from mycroft import state
+from mycroft.config import get_config
 
-# RMS level above which we treat incoming audio as intentional speech (barge-in).
-# Higher than the recording threshold so speaker bleed doesn't trigger it.
-_BARGE_IN_THRESHOLD = 600
-_BARGE_IN_CONFIRM_CHUNKS = 3   # must exceed threshold this many times in a row
+_CARTESIA_URL = "https://api.cartesia.ai/tts/bytes"
+_CARTESIA_RATE = 44100
+_WRITE_BYTES = 4096      # ~46 ms of 16-bit mono at 44.1 kHz; how often a stop request is checked
+
+_BARGE_IN_WARMUP = 0.5   # seconds spent measuring how loud Gaia's own voice is at the microphone
+_BARGE_IN_CHUNKS = 4     # loud chunks in a row (~0.25 s) that count as the user talking
+
+_session = None          # reused HTTP connection, saves a TLS handshake on every sentence
 
 
-def _barge_in_listener() -> None:
-    """Monitor the mic during TTS. If the user speaks, stop playback immediately."""
-    import pyaudio
-    _RATE, _CHUNK = 16000, 1024
-    pa = pyaudio.PyAudio()
+def _clean(text: str) -> str:
+    """Remove markdown that would otherwise be read out as 'asterisk asterisk'."""
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r'^\s*#{1,6}\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*[-*]\s+', '', text, flags=re.MULTILINE)
+    return text.strip()
+
+
+def speak(text: str, api_key: str = "") -> None:
+    """Say `text` and return when it has finished playing or was interrupted."""
+    text = _clean(text)
+    if not text or state.stop_event.is_set():
+        return
+
+    cartesia_key = os.environ.get("CARTESIA_API_KEY", "")
+    elevenlabs_key = api_key or os.environ.get("ELEVENLABS_API_KEY", "")
+    providers = []
+    if cartesia_key:
+        providers.append(("cartesia", lambda played: _speak_cartesia(text, cartesia_key, played)))
+    if elevenlabs_key:
+        providers.append(("elevenlabs", lambda played: _speak_elevenlabs(text, elevenlabs_key, played)))
+    providers.append(("edge-tts", lambda played: _speak_edge(text, played)))
+
+    already_speaking = state.speaking.is_set()
+    state.speaking.set()
+    done = threading.Event()
+    if get_config().barge_in:
+        threading.Thread(target=_barge_in_listener, args=(done,), daemon=True).start()
     try:
-        stream = pa.open(format=pyaudio.paInt16, channels=1, rate=_RATE,
-                         input=True, frames_per_buffer=_CHUNK)
-        consecutive = 0
-        # Brief warm-up delay so the start of Gaia's own voice doesn't trigger it
-        time.sleep(0.4)
-        while not state.stop_event.is_set():
-            data = stream.read(_CHUNK, exception_on_overflow=False)
-            shorts = struct.unpack(f"{len(data) // 2}h", data)
-            rms = math.sqrt(sum(s * s for s in shorts) / len(shorts)) if shorts else 0
-            if rms > _BARGE_IN_THRESHOLD:
-                consecutive += 1
-                if consecutive >= _BARGE_IN_CONFIRM_CHUNKS:
-                    state.stop_event.set()
-                    break
-            else:
-                consecutive = 0
-        stream.stop_stream()
-        stream.close()
-    except Exception:
-        pass
+        for name, provider in providers:
+            played = threading.Event()   # set once any sound has come out
+            try:
+                provider(played)
+                return
+            except Exception as e:
+                print(f"[tts] {name} failed: {e}", flush=True)
+                if played.is_set() or state.stop_event.is_set():
+                    return   # half a sentence was heard; don't start it again in another voice
     finally:
-        pa.terminate()
+        done.set()
+        if not already_speaking:
+            state.speaking.clear()
 
 
-def _play_and_wait(tmp: str) -> None:
-    """Play audio; start a barge-in listener so the user can interrupt instantly."""
+# ── playback ──────────────────────────────────────────────────────────────────
+
+def _output_device():
+    return get_config().output_device or None
+
+
+def _play_pcm(chunks, samplerate: int, played: threading.Event) -> None:
+    """Play 16-bit mono PCM as it arrives, so speech starts before the download has finished."""
+    import sounddevice as sd
+
+    with sd.RawOutputStream(samplerate=samplerate, channels=1, dtype="int16",
+                            device=_output_device()) as out:
+        leftover = b""
+        for chunk in chunks:
+            data = leftover + chunk
+            usable = len(data) - (len(data) % 2)   # a sample is two bytes; keep any odd byte for later
+            leftover = data[usable:]
+            for i in range(0, usable, _WRITE_BYTES):
+                if state.stop_event.is_set():
+                    out.abort()
+                    return
+                out.write(data[i:i + _WRITE_BYTES])
+                played.set()
+        # Leaving the `with` block plays out what is still buffered.
+
+
+def _play_file(path: str, played: threading.Event) -> None:
     import sounddevice as sd
     import soundfile as sf
 
-    data, samplerate = sf.read(tmp, dtype="float32")
-
-    barge_in = threading.Thread(target=_barge_in_listener, daemon=True)
-    barge_in.start()
-
-    sd.play(data, samplerate)
+    data, samplerate = sf.read(path, dtype="float32")
+    sd.play(data, samplerate, device=_output_device())
+    played.set()
     while sd.get_stream().active:
         if state.stop_event.is_set():
             sd.stop()
             return
-        time.sleep(0.05)
+        time.sleep(0.03)
 
 
-def speak(text: str, api_key: str = "") -> None:
-    # Priority: Cartesia (40ms) → ElevenLabs → edge-tts (free)
-    cartesia_key = os.environ.get("CARTESIA_API_KEY", "")
-    elevenlabs_key = api_key or os.environ.get("ELEVENLABS_API_KEY", "")
-
-    if cartesia_key:
-        _speak_cartesia(text, cartesia_key)
-    elif elevenlabs_key:
-        _speak_elevenlabs(text, elevenlabs_key)
-    else:
-        _speak_edge(text)
-
-
-def _speak_cartesia(text: str, api_key: str) -> None:
-    from cartesia import Cartesia
-
-    client = Cartesia(api_key=api_key)
-    voice_id = os.environ.get("CARTESIA_VOICE_ID", "bf0a246a-8642-498a-9950-80c35e9276b5")
-
-    audio_data = b""
-    for chunk in client.tts.sse(
-        model_id="sonic-turbo",
-        transcript=text,
-        voice={"mode": "id", "id": voice_id},
-        language="en",
-        output_format={"container": "mp3", "bit_rate": 128000, "sample_rate": 44100},
-    ):
-        audio_data += chunk.get("audio", b"")
-
-    tmp = tempfile.mktemp(suffix=".mp3")
+def _play_mp3_bytes(audio: bytes, played: threading.Event) -> None:
+    fd, tmp = tempfile.mkstemp(suffix=".mp3")
     try:
-        with open(tmp, "wb") as f:
-            f.write(audio_data)
-        _play_and_wait(tmp)
+        with os.fdopen(fd, "wb") as f:
+            f.write(audio)
+        _play_file(tmp, played)
     finally:
         try:
             os.remove(tmp)
-        except Exception:
+        except OSError:
             pass
 
 
-def _speak_elevenlabs(text: str, api_key: str) -> None:
+# ── providers ─────────────────────────────────────────────────────────────────
+
+def _speak_cartesia(text: str, api_key: str, played: threading.Event) -> None:
+    global _session
+    import requests
+
+    if _session is None:
+        _session = requests.Session()
+    response = _session.post(
+        _CARTESIA_URL,
+        headers={"X-API-Key": api_key, "Cartesia-Version": "2024-11-13"},
+        json={
+            "model_id": os.environ.get("CARTESIA_MODEL", "sonic-turbo"),
+            "transcript": text,
+            "voice": {
+                "mode": "id",
+                "id": os.environ.get("CARTESIA_VOICE_ID", "bf0a246a-8642-498a-9950-80c35e9276b5"),
+            },
+            "language": "en",
+            "output_format": {
+                "container": "raw",
+                "encoding": "pcm_s16le",
+                "sample_rate": _CARTESIA_RATE,
+            },
+        },
+        stream=True,
+        timeout=(5, 30),
+    )
+    try:
+        if response.status_code >= 400:
+            raise RuntimeError(f"HTTP {response.status_code}: {response.text[:200]}")
+        _play_pcm(response.iter_content(chunk_size=_WRITE_BYTES), _CARTESIA_RATE, played)
+    finally:
+        response.close()
+
+
+def _speak_elevenlabs(text: str, api_key: str, played: threading.Event) -> None:
     from elevenlabs.client import ElevenLabs
 
     voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "onwK4e9ZLuTAKqWW03F9")
     client = ElevenLabs(api_key=api_key)
-    audio_bytes = b"".join(
+    audio = b"".join(
         client.text_to_speech.convert(
             voice_id=voice_id,
             text=text,
@@ -115,32 +166,64 @@ def _speak_elevenlabs(text: str, api_key: str) -> None:
             output_format="mp3_44100_128",
         )
     )
-
-    tmp = tempfile.mktemp(suffix=".mp3")
-    try:
-        with open(tmp, "wb") as f:
-            f.write(audio_bytes)
-        _play_and_wait(tmp)
-    finally:
-        try:
-            os.remove(tmp)
-        except Exception:
-            pass
+    _play_mp3_bytes(audio, played)
 
 
-def _speak_edge(text: str) -> None:
+def _speak_edge(text: str, played: threading.Event) -> None:
     import asyncio
     import edge_tts
 
-    async def _run():
-        tmp = tempfile.mktemp(suffix=".mp3")
+    fd, tmp = tempfile.mkstemp(suffix=".mp3")
+    os.close(fd)
+    try:
+        asyncio.run(edge_tts.Communicate(text, "en-GB-SoniaNeural").save(tmp))
+        _play_file(tmp, played)
+    finally:
         try:
-            await edge_tts.Communicate(text, "en-GB-SoniaNeural").save(tmp)
-            _play_and_wait(tmp)
-        finally:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+# ── optional: stop talking when the user starts ───────────────────────────────
+
+def _barge_in_listener(done: threading.Event) -> None:
+    """Watch the microphone while Gaia talks and interrupt her when the user speaks over her.
+
+    Her own voice reaches the microphone too, so the first half second measures that level and
+    the user has to be clearly louder than it. Off by default (audio.barge_in in config.yaml):
+    in a workshop, tools and music set it off. The wake word interrupts her either way.
+    """
+    import pyaudio
+    import numpy as np
+    from mycroft.audio.devices import open_input
+
+    rate, chunk = 16000, 1024
+    floor = get_config().barge_in_threshold
+    pa = pyaudio.PyAudio()
+    stream = None
+    try:
+        stream = open_input(pa, rate, chunk)
+        started = time.monotonic()
+        own_voice = 0.0
+        loud_run = 0
+        while not done.is_set() and not state.stop_event.is_set():
+            samples = np.frombuffer(stream.read(chunk, exception_on_overflow=False), dtype=np.int16)
+            rms = float(np.sqrt(np.mean(samples.astype(np.float64) ** 2))) if samples.size else 0.0
+            if time.monotonic() - started < _BARGE_IN_WARMUP:
+                own_voice = max(own_voice, rms)
+                continue
+            loud_run = loud_run + 1 if rms > max(floor, own_voice * 2.5) else 0
+            if loud_run >= _BARGE_IN_CHUNKS:
+                state.interrupt_by_voice()
+                return
+    except Exception as e:
+        print(f"[tts] barge-in listener stopped: {e}", flush=True)
+    finally:
+        if stream is not None:
             try:
-                os.remove(tmp)
+                stream.stop_stream()
+                stream.close()
             except Exception:
                 pass
-
-    asyncio.run(_run())
+        pa.terminate()

@@ -194,7 +194,7 @@ def _fetch_system() -> dict:
     global _prev_net, _prev_net_ts
     cpu  = psutil.cpu_percent(interval=None)
     ram  = psutil.virtual_memory().percent
-    disk = psutil.disk_usage('/').percent if True else 0
+    disk = psutil.disk_usage(str(Path.home().anchor or '/')).percent
     net  = psutil.net_io_counters()
     now  = time.time()
     net_up = net_down = 0.0
@@ -260,9 +260,21 @@ def wait_for_trigger():
     _trigger_queue.get()
 
 
-def start(port: int = 5050):
+def clear_triggers():
+    """Forget triggers that arrived while a session was already running."""
+    while True:
+        try:
+            _trigger_queue.get_nowait()
+        except queue.Empty:
+            return
+
+
+def start(host: str = "127.0.0.1", port: int = 5050):
+    # The HUD polls several times a minute; keep those request lines out of the console.
+    import logging
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
     t = threading.Thread(
-        target=lambda: _sio.run(_app, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True),
+        target=lambda: _sio.run(_app, host=host, port=port, allow_unsafe_werkzeug=True),
         daemon=True,
     )
     t.start()

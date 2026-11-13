@@ -5,7 +5,10 @@ from datetime import datetime
 from mycroft.capabilities.search import web_search, youtube_search, open_url
 from mycroft.capabilities.calculator import evaluate_expression, geometry, GEOMETRY_FORMULAS
 from mycroft.capabilities.system import take_screenshot, read_clipboard
-from mycroft.capabilities.computer import mouse_click, double_click, keyboard_type, key_press, scroll, find_and_click, focus_window, list_windows
+from mycroft.capabilities.computer import (
+    mouse_click, double_click, keyboard_type, key_press, scroll,
+    find_and_click, focus_window, list_windows, open_app,
+)
 
 _NOTES_DIR = Path.home() / "gaia_notes"
 
@@ -23,31 +26,35 @@ def save_note(title: str, content: str) -> str:
     fname = _safe_filename(title) or "note"
     path = _NOTES_DIR / f"{fname}.md"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    text = f"# {title}\n_Sparat: {timestamp}_\n\n{content}\n"
+    text = f"# {title}\n_Saved: {timestamp}_\n\n{content}\n"
     path.write_text(text, encoding="utf-8")
-    return f"Anteckning sparad: {path}"
+    return f"Note saved as '{title}'."
 
 
 def recall_notes(query: str) -> str:
     _ensure_notes_dir()
     files = list(_NOTES_DIR.glob("*.md"))
     if not files:
-        return "Inga anteckningar sparade ännu."
-    q = query.lower()
-    hits = []
+        return "No notes have been saved yet."
+    words = [w for w in re.findall(r"\w+", query.lower()) if len(w) > 2] or [query.lower()]
+    scored = []
     for f in files:
         try:
             text = f.read_text(encoding="utf-8")
-            if q in text.lower():
-                hits.append(f"--- {f.stem} ---\n{text.strip()}")
         except Exception:
-            pass
+            continue
+        haystack = f"{f.stem} {text}".lower()
+        score = sum(1 for w in words if w in haystack)
+        if score:
+            scored.append((score, f"--- {f.stem} ---\n{text.strip()}"))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    hits = [note for _, note in scored]
     if not hits:
         all_notes = "\n\n".join(
             f"--- {f.stem} ---\n{f.read_text(encoding='utf-8').strip()}"
             for f in files[:10]
         )
-        return f"Inga träffar för '{query}'. Alla anteckningar:\n\n{all_notes}"
+        return f"Nothing matches '{query}'. All saved notes:\n\n{all_notes}"
     return "\n\n".join(hits[:5])
 
 
@@ -66,7 +73,7 @@ TOOLS = [
     },
     {
         "name": "youtube_search",
-        "description": "Search YouTube for video tutorials or demonstrations and automatically opens the top result in the browser. Use this when the user asks to find or watch a video — no need to call open_url afterwards.",
+        "description": "Search YouTube and open the top result in the browser. Use this when the user asks to find or watch a video. The video is already open when this returns, so do not call open_url for it.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -78,7 +85,7 @@ TOOLS = [
     },
     {
         "name": "open_url",
-        "description": "Open a URL in the user's default web browser. Use after youtube_search to open the best video result, or to open any webpage.",
+        "description": "Open a web page in the user's browser. Not needed after youtube_search, which opens its top result itself.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -196,7 +203,7 @@ TOOLS = [
     },
     {
         "name": "key_press",
-        "description": "Press a key or keyboard shortcut. Examples: 'enter', 'escape', 'tab', 'space', 'ctrl+v', 'ctrl+c', 'ctrl+a', 'win', 'alt+f4', 'ctrl+shift+t'.",
+        "description": "Press a key or keyboard shortcut. Examples: 'enter', 'escape', 'tab', 'space', 'ctrl+v', 'ctrl+a', 'win', 'alt+f4', 'ctrl+shift+t'. Media keys control whatever is playing (Spotify, YouTube) without focusing it: 'playpause', 'nexttrack', 'prevtrack', 'volumeup', 'volumedown', 'volumemute'.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -207,14 +214,25 @@ TOOLS = [
     },
     {
         "name": "scroll",
-        "description": "Scroll the mouse wheel up or down at the current cursor position.",
+        "description": "Scroll the mouse wheel up or down at the current cursor position. Click inside the area to scroll first.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "direction": {"type": "string", "enum": ["up", "down"], "description": "Scroll direction"},
-                "amount": {"type": "integer", "description": "Number of scroll clicks (default 3)"},
+                "amount": {"type": "integer", "description": "Number of wheel notches (default 3; about 3 lines each)"},
             },
             "required": ["direction"],
+        },
+    },
+    {
+        "name": "open_app",
+        "description": "Start a program on the computer by name, e.g. 'Spotify', 'Notepad', 'Brave', 'Fusion 360'. Use this instead of clicking through the Start menu yourself.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Program name as it appears in the Start menu"},
+            },
+            "required": ["name"],
         },
     },
     {
@@ -235,12 +253,12 @@ TOOLS = [
     },
     {
         "name": "find_and_click",
-        "description": "Click a button or UI element in an app by name — no screenshot or coordinates needed. Works for most standard Windows apps, browsers, Spotify, File Explorer. Use this before falling back to mouse_click with coordinates.",
+        "description": "Click a button, menu item, tab, list item or link in an app by its visible name — no screenshot or coordinates needed. Works for most standard Windows apps, browsers, Spotify, File Explorer. Use this before falling back to mouse_click with coordinates.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "window_title": {"type": "string", "description": "Partial title of the app window, e.g. 'Spotify'"},
-                "control_name": {"type": "string", "description": "Name of the button or control to click, e.g. 'Play', 'Search', 'Close'"},
+                "control_name": {"type": "string", "description": "Visible name of the control to click, e.g. 'Play', 'Search', 'Close'"},
             },
             "required": ["window_title", "control_name"],
         },
@@ -248,7 +266,7 @@ TOOLS = [
 ]
 
 
-def dispatch_tool(name: str, inputs: dict) -> str:
+def dispatch_tool(name: str, inputs: dict) -> str | dict:
     if name == "web_search":
         results = web_search(inputs["query"], inputs.get("max_results", 5))
         if not results:
@@ -304,6 +322,9 @@ def dispatch_tool(name: str, inputs: dict) -> str:
 
     if name == "scroll":
         return scroll(inputs["direction"], inputs.get("amount", 3))
+
+    if name == "open_app":
+        return open_app(inputs["name"])
 
     if name == "list_windows":
         return list_windows()

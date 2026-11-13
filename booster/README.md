@@ -1,150 +1,83 @@
-# Booster — Garage AI Assistant
+# Gaia — Garage AI Assistant
 
-Your voice-activated workshop buddy. Say "Hey Booster" and ask anything.
+A voice assistant for the workshop PC. Say **"Hey Jarvis"**, ask, and she answers out loud.
 
-## What it can do
+## What she can do
 
-- **Web search** — "Booster, look up torque specs for a 351 Windsor"
-- **YouTube** — "Find me a video on TIG welding aluminium" (opens browser + summarises)
-- **Math & geometry** — "What's the area of a 7-inch circle?"
-- **Calculations** — "If I need 3 litres of 30% epoxy, how much hardener is that?"
-- **Project planning** — "Help me plan building a tool wall"
+- **Web search** — "look up torque specs for a 351 Windsor"
+- **YouTube** — "find me a video on TIG welding aluminium" (opens the best match)
+- **Maths and geometry** — "what's the volume of a cylinder 40 across and 120 long?"
+- **Notes** — "remember the engine bay is 820 millimetres wide", "what was the engine bay width?"
+- **The screen** — "what am I looking at?", "read what I copied"
+- **The computer** — "open Spotify", "pause the music", "click Search in Brave"
+- **Morning briefing** — weather, top headline and your latest note at startup
 
-## Requirements
+## Talking to her
 
-- Python 3.11+
-- Windows, Linux (Ubuntu/Debian), or macOS
-- Microphone + speakers
-- `ANTHROPIC_API_KEY` environment variable
+| Say | What happens |
+|---|---|
+| "Hey Jarvis" | She starts listening. Also interrupts her while she is talking. |
+| a question | She answers and keeps listening for a follow-up. |
+| "mute", "stop", "quiet" | She goes silent and back to standby, without replying. |
+| "thanks", "that's all" | "Alright, I'll stand by." |
+| "goodbye", "shut down" | Gaia exits. |
+| nothing for 20 seconds | Back to standby. |
 
----
+Spacebar in the HUD starts a session, Escape stops her.
 
-## Install — Windows
+## Install (Windows)
 
-### 1. Install Python 3.11+
+1. Install [Python 3.11 or 3.12](https://www.python.org/downloads/) with **Add Python to PATH** ticked.
+2. Run `install.bat`. It creates `venv`, installs everything and opens `.env`.
+3. Put your keys in `.env` (see `.env.example`). Anthropic and OpenAI are required; a Cartesia or
+   ElevenLabs key gives a better voice.
+4. Run `mycroft.bat`.
 
-Download from [python.org](https://www.python.org/downloads/). Check **"Add Python to PATH"** during install.
-
-### 2. Install PyAudio (Windows needs this done separately)
-
-PyAudio requires PortAudio. The easiest way on Windows:
-
-```powershell
-pip install pipwin
-pipwin install pyaudio
-```
-
-If `pipwin` fails, download the matching `.whl` from
-https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
-then install it with `pip install <filename>.whl`.
-
-### 3. Set up the project
+After a `git pull`, update the packages with:
 
 ```powershell
-cd booster
-python -m venv venv
-venv\Scripts\activate
-pip install -e .
+venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 4. Set your API key
+**Start with Windows:** right-click `setup_autostart.ps1` → *Run with PowerShell*, once.
 
-Copy the example env file and fill it in:
+## Settings
 
-```powershell
-copy .env.example .env
-notepad .env
-```
+Everything is in `config.yaml`:
 
-Add your key:
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Or set it for the current session only:
-
-```powershell
-$env:ANTHROPIC_API_KEY = "sk-ant-..."
-```
-
-### 5. Run Booster
-
-```powershell
-venv\Scripts\activate
-booster
-# or:
-python -m booster.main
-```
-
----
-
-## Install — Linux (Ubuntu/Debian)
-
-```bash
-sudo apt update
-sudo apt install -y portaudio19-dev python3-dev espeak-ng
-
-cd booster
-python3 -m venv venv
-source venv/bin/activate
-pip install -e .
-
-cp .env.example .env
-# Edit .env and fill in ANTHROPIC_API_KEY
-
-booster
-```
-
----
-
-## Install — macOS
-
-```bash
-brew install portaudio
-
-cd booster
-python3 -m venv venv
-source venv/bin/activate
-pip install -e .
-
-cp .env.example .env
-# Edit .env and fill in ANTHROPIC_API_KEY
-
-booster
-```
-
----
-
-## Usage
-
-| Mode | Default | How to activate |
+| Setting | Default | Meaning |
 |---|---|---|
-| Wake word | default | Say **"Hey Booster"** |
-| Push-to-talk | fallback if mic unavailable | Press **Enter** then speak |
+| `gaia.model` | `claude-sonnet-5` | Claude model. A faster model answers sooner, a larger one reasons better. |
+| `gaia.wake_word_threshold` | `0.3` | Lower triggers more easily. |
+| `audio.input_device` / `output_device` | blank | Part of a device name; blank uses the Windows default. |
+| `audio.silence_secs` | `2.8` | Pause that ends a command. Lower means faster replies, but she may cut you off. |
+| `audio.session_timeout_secs` | `20` | Silence before she returns to standby. `0` keeps listening forever. |
+| `audio.barge_in` | `false` | `true` makes any loud sound stop her talking. |
+| `ui.host` | `127.0.0.1` | Set to `0.0.0.0` to open the HUD from a tablet or phone on the same network. |
 
-Say **"Goodbye Booster"** or press **Ctrl+C** to quit.
+List microphones and speakers with:
 
----
+```powershell
+venv\Scripts\python.exe -m mycroft.audio.devices
+```
 
-## Configuration
+## If something is off
 
-Edit `config.yaml` to change defaults.
+- **Music sounds dull or like a phone call while Gaia runs.** A Bluetooth headset or speaker that is
+  also the microphone switches to its low-quality call mode whenever the microphone is open. Use a
+  separate microphone (USB or built-in) and set it as `audio.input_device`.
+- **She doesn't hear the wake word.** Lower `gaia.wake_word_threshold`, and check the microphone with
+  the command above.
+- **She cuts you off, or waits too long.** Adjust `audio.silence_secs`.
+- **The window closes at startup.** Start `gaia_autostart.bat` by hand; it stays open and shows the error.
 
-| Key | Default | Options |
-|---|---|---|
-| `audio.tts_backend` | `gtts` | `gtts`, `pyttsx3` |
-| `audio.stt_backend` | `google` | `google` |
-| `audio.wake_mode` | `wake_word` | `wake_word`, `push_to_talk` |
-| `booster.model` | `claude-sonnet-4-6` | any Anthropic model |
+## Layout
 
-On Windows, `pyttsx3` uses the built-in Windows SAPI5 voices — no extra install needed.
-`gtts` (Google TTS) is the default and sounds more natural but requires internet.
-
----
-
----
-
-## Offline mode
-
-If internet is unavailable, set `audio.tts_backend: pyttsx3` in `config.yaml` for offline speech synthesis.
-STT requires internet (Google Speech Recognition). For offline STT, install `openai-whisper` and set `audio.stt_backend: whisper`.
+```
+mycroft/main.py            the listen → think → speak loop
+mycroft/brain/             Claude client and tool definitions
+mycroft/audio/             recording, speech-to-text, text-to-speech
+mycroft/capabilities/      search, calculator, screen, computer control, wake word, briefing
+mycroft/ui/                the browser HUD
+pi_gateway/                Raspberry Pi at the garage door: wake phrase → lights + Wake-on-LAN
+```
