@@ -8,3 +8,4 @@ dist/
 build/
 .DS_Store
 ~/booster_plans/
+gaia.log

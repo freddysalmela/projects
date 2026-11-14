@@ -85,7 +85,7 @@ def main():
         try:
             ww.start(cfg.wake_word_model, ui.trigger, threshold=cfg.wake_word_threshold)
         except Exception as e:
-            print_error(f"Wake word not started: {e}")
+            print_error(f"Wake word not started: {type(e).__name__}: {e}")
             return False
         idle["label"] = f"SAY {wake_label}..."
         print_status(f"Wake word active — say '{wake_label}' to start.")
@@ -152,7 +152,7 @@ def main():
                 tts_q.put(sentence)
         except Exception as e:
             print()
-            print_error(str(e))
+            print_error(f"{type(e).__name__}: {e}")
             if not state.stop_event.is_set():
                 tts_q.put("Sorry, I ran into a problem with that." if not sentences
                           else "Sorry, I lost the thread there.")
@@ -233,7 +233,8 @@ def main():
             print_status("Goodbye!")
             sys.exit(0)
         except Exception as e:
-            print_error(str(e))
+            print_error(f"{type(e).__name__}: {e}")
+            print_status("Details were saved to gaia.log in the booster folder.")
             ui.set_state("idle", status="ERROR — TRY AGAIN")
             time.sleep(2)
         finally:
