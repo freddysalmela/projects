@@ -71,18 +71,37 @@ def main():
     if briefing:
         speak(briefing, tts_key)
 
-    # Wake word — tries to start openwakeword; falls back to spacebar on error
-    ww = None
+    # Wake word. Right after login the microphone or the network may not be up yet, so a
+    # failed start is retried in the background; until it works, the spacebar starts a session.
+    wake_label = cfg.wake_word_model.replace("_", " ").upper()
+    idle = {"label": "PRESS SPACE TO START", "in_session": False}
     try:
         from mycroft.capabilities import wake_word as ww
-        ww.start(cfg.wake_word_model, ui.trigger, threshold=cfg.wake_word_threshold)
-        wake_label = cfg.wake_word_model.replace("_", " ").upper()
-        print_status(f"Wake word active — say '{wake_label}' to start.")
-        idle_label = f"SAY {wake_label}..."
     except Exception as e:
         ww = None
-        print_status(f"Wake word unavailable ({e}), using spacebar.")
-        idle_label = "PRESS SPACE TO START"
+        print_error(f"Wake word cannot be loaded ({e}). Use the spacebar in the HUD.")
+
+    def start_wake_word() -> bool:
+        try:
+            ww.start(cfg.wake_word_model, ui.trigger, threshold=cfg.wake_word_threshold)
+        except Exception as e:
+            print_error(f"Wake word not started: {e}")
+            return False
+        idle["label"] = f"SAY {wake_label}..."
+        print_status(f"Wake word active — say '{wake_label}' to start.")
+        return True
+
+    def keep_trying_wake_word():
+        while True:
+            time.sleep(10)
+            if start_wake_word():
+                if not idle["in_session"]:
+                    ui.set_state("idle", status=idle["label"])
+                return
+
+    if ww and not start_wake_word():
+        print_status("Retrying the wake word every 10 seconds. Until then, press space in the HUD.")
+        threading.Thread(target=keep_trying_wake_word, daemon=True).start()
 
     def respond(text: str) -> None:
         """Send the request to Claude and speak the answer as it streams in."""
@@ -192,7 +211,8 @@ def main():
 
     while True:
         try:
-            ui.set_state("idle", status=idle_label)
+            idle["in_session"] = False
+            ui.set_state("idle", status=idle["label"])
             ui.wait_for_trigger()
         except KeyboardInterrupt:
             print_status("Goodbye!")
@@ -201,6 +221,7 @@ def main():
         # A stop left over from the last session must not silence this one.
         state.stop_event.clear()
         state.barge_in.clear()
+        idle["in_session"] = True
         if ww:
             ww.set_session_active(True)
 

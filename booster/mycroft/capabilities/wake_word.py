@@ -12,10 +12,15 @@ _CHUNK = 1280   # 80ms at 16kHz — openwakeword's preferred frame size
 _RATE  = 16000
 _THRESHOLD = 0.3
 _COOLDOWN_SECS = 1.5   # one spoken wake phrase scores high for several frames in a row
+_INTERRUPT_GRACE_SECS = 3.0   # the phrase that opened a session must not also interrupt it
+_INTERRUPT_MIN_SCORE = 0.5    # interrupting her needs a clearer match than waking her
+_session_started = 0.0
 
 
 def set_session_active(active: bool):
+    global _session_started
     if active:
+        _session_started = time.monotonic()
         _session_active.set()
     else:
         _session_active.clear()
@@ -30,11 +35,19 @@ def start(model_name: str, on_detected, threshold: float = _THRESHOLD) -> thread
     import openwakeword
     from openwakeword.model import Model
 
-    openwakeword.utils.download_models()
+    try:
+        openwakeword.utils.download_models()
+    except Exception as e:
+        # No network yet. If the model files are already on disk, loading still works below.
+        print(f"[wake] could not check for model downloads: {e}", flush=True)
     oww = Model(wakeword_models=[model_name], inference_framework="onnx")
 
     pa = pyaudio.PyAudio()
-    stream = open_input(pa, _RATE, _CHUNK)
+    try:
+        stream = open_input(pa, _RATE, _CHUNK)
+    except Exception:
+        pa.terminate()
+        raise
 
     def _loop():
         nonlocal stream
@@ -70,7 +83,9 @@ def start(model_name: str, on_detected, threshold: float = _THRESHOLD) -> thread
                 last_trigger = time.monotonic()
                 oww.reset()
                 on_detected()
-            elif state.speaking.is_set():
+            elif (state.speaking.is_set()
+                  and score >= max(threshold, _INTERRUPT_MIN_SCORE)
+                  and time.monotonic() - _session_started > _INTERRUPT_GRACE_SECS):
                 print(f"[wake] score={score:.2f} — interrupting", flush=True)
                 last_trigger = time.monotonic()
                 oww.reset()
