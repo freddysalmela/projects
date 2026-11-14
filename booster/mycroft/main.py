@@ -10,8 +10,8 @@ from datetime import datetime
 from mycroft import state
 from mycroft.audio.recorder import record
 from mycroft.audio.stt import transcribe
-from mycroft.audio.tts import speak
-from mycroft.config import get_config
+from mycroft.audio.tts import speak, voice_summary
+from mycroft.config import get_config, ENV_FILE
 from mycroft.brain.claude_client import ClaudeClient
 from mycroft.ui.terminal import print_banner, print_user, print_mycroft, print_status, print_error
 from mycroft.ui import server as ui
@@ -55,6 +55,8 @@ def main():
 
     print_banner()
     print_status(f"Model: {cfg.model}")
+    print_status(f"Voice: {voice_summary(tts_key)}")
+    print_status(f"Keys:  {ENV_FILE}" if ENV_FILE.exists() else f"Keys:  no .env file at {ENV_FILE}")
 
     # Start the HUD server and open the browser
     ui.start(host=cfg.ui_host, port=cfg.ui_port)
@@ -81,11 +83,16 @@ def main():
         ww = None
         print_error(f"Wake word cannot be loaded ({e}). Use the spacebar in the HUD.")
 
+    last_wake_error = [""]
+
     def start_wake_word() -> bool:
         try:
             ww.start(cfg.wake_word_model, ui.trigger, threshold=cfg.wake_word_threshold)
         except Exception as e:
-            print_error(f"Wake word not started: {type(e).__name__}: {e}")
+            message = f"Wake word not started: {type(e).__name__}: {e}"
+            if message != last_wake_error[0]:   # say it once, not every 10 seconds
+                last_wake_error[0] = message
+                print_error(message)
             return False
         idle["label"] = f"SAY {wake_label}..."
         print_status(f"Wake word active — say '{wake_label}' to start.")

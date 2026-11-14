@@ -16,18 +16,54 @@ def input_device_index(pa, name: str) -> int | None:
     return None
 
 
+class NoMicrophone(RuntimeError):
+    pass
+
+
 def open_input(pa, rate: int, chunk: int):
-    """Open a 16-bit mono input stream on the configured microphone."""
+    """Open a 16-bit mono input stream on the configured microphone.
+
+    If that one cannot be opened (Windows has no default recording device, or the chosen one
+    is unplugged), every other microphone is tried before giving up.
+    """
     import pyaudio
     from mycroft.config import get_config
 
-    return pa.open(
-        format=pyaudio.paInt16,
-        channels=1,
-        rate=rate,
-        input=True,
-        frames_per_buffer=chunk,
-        input_device_index=input_device_index(pa, get_config().input_device),
+    def try_open(index):
+        return pa.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=rate,
+            input=True,
+            frames_per_buffer=chunk,
+            input_device_index=index,
+        )
+
+    first_error = None
+    try:
+        return try_open(input_device_index(pa, get_config().input_device))
+    except Exception as e:
+        first_error = e
+
+    names = []
+    for i in range(pa.get_device_count()):
+        info = pa.get_device_info_by_index(i)
+        if info.get("maxInputChannels", 0) <= 0:
+            continue
+        names.append(str(info.get("name", i)))
+        try:
+            return try_open(i)
+        except Exception:
+            continue
+
+    if names:
+        raise NoMicrophone(
+            f"None of the microphones Windows lists could be opened ({', '.join(names)}). "
+            f"Check Settings > Privacy & security > Microphone. First error: {first_error}"
+        )
+    raise NoMicrophone(
+        "Windows reports no microphone at all. Plug one in or switch it on, and check "
+        "Settings > System > Sound > Input."
     )
 
 

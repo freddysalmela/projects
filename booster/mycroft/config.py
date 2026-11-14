@@ -9,7 +9,8 @@ _ROOT = Path(__file__).parent.parent
 _CONFIG_FILE = _ROOT / "config.yaml"
 
 # Load .env from the project folder, so it works whatever directory Gaia is started from.
-load_dotenv(_ROOT / ".env")
+ENV_FILE = _ROOT / ".env"
+load_dotenv(ENV_FILE)
 load_dotenv()
 
 

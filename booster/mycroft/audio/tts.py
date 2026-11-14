@@ -28,14 +28,23 @@ def _clean(text: str) -> str:
     return text.strip()
 
 
+def voice_summary(api_key: str = "") -> str:
+    """Which voice will be used, for the startup banner."""
+    if os.environ.get("CARTESIA_API_KEY", "").strip():
+        return "Cartesia"
+    if (api_key or os.environ.get("ELEVENLABS_API_KEY", "")).strip():
+        return "ElevenLabs"
+    return "edge-tts (free). No CARTESIA_API_KEY or ELEVENLABS_API_KEY was found in .env"
+
+
 def speak(text: str, api_key: str = "") -> None:
     """Say `text` and return when it has finished playing or was interrupted."""
     text = _clean(text)
     if not text or state.stop_event.is_set():
         return
 
-    cartesia_key = os.environ.get("CARTESIA_API_KEY", "")
-    elevenlabs_key = api_key or os.environ.get("ELEVENLABS_API_KEY", "")
+    cartesia_key = os.environ.get("CARTESIA_API_KEY", "").strip()
+    elevenlabs_key = (api_key or os.environ.get("ELEVENLABS_API_KEY", "")).strip()
     providers = []
     if cartesia_key:
         providers.append(("cartesia", lambda played: _speak_cartesia(text, cartesia_key, played)))
